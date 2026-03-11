@@ -1,4 +1,5 @@
 import { db } from '../core/db.js';
+import { normalizeSlotMeta } from './recipeMeta.js';
 
 function normalizeCo2Label(value) {
   if (value <= 1.6) return 'grün';
@@ -204,11 +205,11 @@ export function generateRecipesForMenu(menu) {
   const stmt = db.prepare('INSERT INTO recipes (menu_id, option_type, meal_slot, title, ingredients, steps, meta) VALUES (?, ?, ?, ?, ?, ?, ?)');
   for (const [optionType, slot, title, vegan] of entries) {
     const recipe = buildBySlot(slot, vegan, title);
-    const meta = {
+    const meta = normalizeSlotMeta({
       ...recipe.meta,
       tipsShopping: recipe.tipsShopping,
       tipsCooking: recipe.tipsCooking
-    };
+    }, slot);
     stmt.run(
       menu.id,
       optionType,
