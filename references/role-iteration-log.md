@@ -123,3 +123,20 @@ Integration Review:
 - Retailer-Pipeline (Migros/Coop/Aldi/Lidl) nutzt jetzt robustere Selektor- und JSON-Fallback-Ketten mit Source-gewichteter Auswahl.
 - Ingredient-Normalisierung/Harmonisierung wurde um source-aware Dedup und zusätzliche Synonyme erweitert; Matching trifft Angebotslage zuverlässiger.
 - SEO/UX-Elemente bleiben aktiv (Intent-Landing, Cluster, strukturierte Daten, Linkhubs, Freshness, Print/Export), Plattform bleibt leichtgewichtig (SSR + SQLite, 0 neue Runtime-Dependencies).
+
+## Iteration 9
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Genau ein Night-Loop auf Priorität „Retailer-Qualität + Matching-Fit + stabile SEO-UX-Flächen“ durchgezogen | Verzettelung über alte Backlogs | Scope strikt auf 4 Händler + Mapping + Tests begrenzt |
+| CTO | Extraktionsstrategie vertieft: source-priorisierte Raw-Dedupe, differenzierte JSON-Source-Tags (`ld+json`/`__NEXT_DATA__`), robustere Kandidatenauswahl | Heuristik-Overfit | konservative Schwellen + Fill-up-Fallback beibehalten |
+| CFO | Lightweight-Grenze eingehalten (0 neue Dependencies), nur modulare Service-/Test-Änderungen | steigende Heuristik-Wartung | klare Helper-Funktionen + Contract-Tests als Kostenbremse |
+| Designer | Bestehende Intent-/Cluster-/Index-/Print-Flows bewusst stabil gehalten (kein zusätzlicher UI-Overhead) | visuell wenig „neu“ | Fokus auf Relevanz/Conversion über Datenqualität |
+| Nutrition Lead | Harmonisierung erweitert (Retail-Label/Preis/Einheit-Cleanup, zusätzliche Synonyme wie Courgette/Kefir, konsistentere Canonicals) | Fehlmapping bei Randbegriffen | bekannte Canonicals priorisieren, Soft-Fallback konservativ |
+| AgentOps Lead | Validierungstests ergänzt: JSON-vs-selector-Dedupe, Unit/Label-Cleanup-Mapping, cross-retailer vegan Matching | zusätzliche Testlaufzeit | kleine Fixtures, schnelle Einzeltests, grüner Gesamtlauf |
+
+Integration Review:
+- Vier Retailer profitieren von robusterer Extraction + Dedupe + JSON-Fallback-Auswertung.
+- Ingredient-Normalisierung/Harmonisierung verbessert Canonical-Qualität und reduziert Label-/Preisrauschen.
+- Menü-Matching richtet sich stärker nach realer Angebotslage (inkl. retailer-diversity Signal), bei unverändert leichtgewichtiger Architektur.
+

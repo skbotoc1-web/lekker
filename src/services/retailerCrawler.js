@@ -84,7 +84,12 @@ function collectJsonNames($) {
     if (!raw) return;
     const parsed = tryParseJson(raw);
     if (!parsed) return;
-    extractJsonNames(parsed, out);
+    const scriptId = $(el).attr('id') || '';
+    const scriptType = $(el).attr('type') || 'application/json';
+    const sourceTag = scriptId ? `${scriptType}#${scriptId}` : scriptType;
+
+    const names = extractJsonNames(parsed, []);
+    for (const name of names) out.push({ value: name, sourceTag });
   });
   return out;
 }
@@ -112,21 +117,33 @@ function collectSelectorCandidates($, selectors) {
   return out;
 }
 
+function sourcePriority(sourceTag = '') {
+  const lowered = String(sourceTag).toLowerCase();
+  if (lowered.includes('__next_data__')) return 4;
+  if (lowered.includes('ld+json')) return 3;
+  if (lowered.includes('attr:data')) return 2;
+  if (lowered.includes('attr:title') || lowered.includes('attr:aria')) return 1.5;
+  if (lowered.includes('selector')) return 1;
+  return 0;
+}
+
 function dedupeRawCandidates(items = []) {
-  const seen = new Set();
-  const out = [];
+  const grouped = new Map();
+
   for (const item of items) {
     const normalized = String(item.value || '')
       .toLowerCase()
       .replace(/[^\p{L}\p{N}]+/gu, ' ')
       .trim();
     if (!normalized || normalized.length < 3 || HEADING_NOISE.test(normalized)) continue;
-    const key = `${normalized}|${item.sourceTag}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(item);
+
+    const current = grouped.get(normalized);
+    if (!current || sourcePriority(item.sourceTag) > sourcePriority(current.sourceTag)) {
+      grouped.set(normalized, item);
+    }
   }
-  return out;
+
+  return [...grouped.values()];
 }
 
 function sourceWeight(sourceTags = []) {
@@ -187,7 +204,7 @@ export function parseRetailerHtml(html, retailerId) {
   if (!retailer) throw new Error(`Unknown retailer ${retailerId}`);
 
   const $ = cheerio.load(html || '');
-  const jsonCandidates = collectJsonNames($).map(value => ({ value, sourceTag: 'application/ld+json' }));
+  const jsonCandidates = collectJsonNames($);
   const selectorCandidates = collectSelectorCandidates($, retailer.selectors);
   const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates]);
 

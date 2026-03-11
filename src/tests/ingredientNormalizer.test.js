@@ -74,3 +74,13 @@ test('harmonizeIngredientCandidates keeps source tags for stronger fallback rank
   assert.ok(broccoli.sourceTags.includes('application/ld+json'));
   assert.ok(broccoli.sourceTags.includes('attr:data'));
 });
+
+test('normalizeIngredient cleans retail labels, prices and unit clutter', () => {
+  const a = normalizeIngredient('Top Deal CHF 5.95 · Pouletbrustfilet 2 x 250g');
+  const b = normalizeIngredient('Wochenhit: Kefir Nature 500ml');
+  const c = normalizeIngredient('Courgette Bio 1kg');
+
+  assert.equal(a?.canonical, 'Pouletbrust');
+  assert.equal(b?.canonical, 'Naturjoghurt');
+  assert.equal(c?.canonical, 'Zucchini');
+});

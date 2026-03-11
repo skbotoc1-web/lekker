@@ -72,3 +72,16 @@ test('menu planner favors high keyword coverage from harmonized omni offers', ()
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_lunch, 'Poulet-Quinoa-Salat');
 });
+
+test('menu planner aligns vegan dinner with cross-retailer harmonized offers', () => {
+  const day = '2026-03-18';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'abendessen', 1, 'Tofu', 'migros');
+  insert.run(day, 'abendessen', 1, 'Süsskartoffeln', 'coop');
+  insert.run(day, 'abendessen', 1, 'Brokkoli', 'lidl');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.vegan_dinner, 'Süsskartoffel-Tofu-Blech');
+});

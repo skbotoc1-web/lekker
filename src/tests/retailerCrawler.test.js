@@ -122,3 +122,24 @@ test('scraper output contract is stable for all retailers', () => {
     }
   }
 });
+
+test('retailer parser prefers stronger JSON source and removes duplicate noise', () => {
+  const html = `
+    <article><h2>Paprika Bio</h2></article>
+    <article><h2>Paprika Bio</h2></article>
+    <script id="__NEXT_DATA__" type="application/json">
+      {"props":{"pageProps":{"products":[{"name":"Paprika Bio"},{"name":"Bio Brokkoli"}]}}}
+    </script>
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"ItemList","itemListElement":[{"name":"Paprika Bio"}]}
+    </script>
+  `;
+
+  const out = parseRetailerHtml(html, 'migros');
+  const items = out.map(x => x.item);
+  assert.equal(items.includes('Peperoni'), true);
+  assert.equal(items.includes('Brokkoli'), true);
+
+  const pepperoniRows = out.filter(x => x.item === 'Peperoni');
+  assert.equal(pepperoniRows.length, 1);
+});

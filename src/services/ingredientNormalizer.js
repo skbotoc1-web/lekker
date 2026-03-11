@@ -19,7 +19,7 @@ const KNOWN_INGREDIENTS = [
   { re: /\b(vollkorn)?pasta|nudeln?\b/i, canonical: 'Vollkornpasta', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bbrokkoli\b/i, canonical: 'Brokkoli', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bspinat\b/i, canonical: 'Spinat', veganLikely: true, categoryHint: 'mittagessen' },
-  { re: /\bzucchini|zucchetti\b/i, canonical: 'Zucchini', veganLikely: true, categoryHint: 'abendessen' },
+  { re: /\b(zucchini|zucchetti|courgette)\b/i, canonical: 'Zucchini', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\b(peperoni|paprika)\b/i, canonical: 'Peperoni', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\bkartoffeln?\b/i, canonical: 'Kartoffeln', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bsuesskartoffeln?|susskartoffeln?\b/i, canonical: 'Süsskartoffeln', veganLikely: true, categoryHint: 'abendessen' },
@@ -40,6 +40,7 @@ const KNOWN_INGREDIENTS = [
   { re: /\bthunfisch(?:filet|steak)?\b/i, canonical: 'Thunfisch', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\beier?|ei\b/i, canonical: 'Eier', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bskyr\b/i, canonical: 'Skyr', veganLikely: false, categoryHint: 'fruehstueck' },
+  { re: /\bkefir\b/i, canonical: 'Naturjoghurt', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bjoghurt\b/i, canonical: 'Naturjoghurt', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\b(kaese|käse|mozzarella|feta|huettenkaese|hüttenkäse)\b/i, canonical: 'Käse', veganLikely: false, categoryHint: 'snack' }
 ];
@@ -48,6 +49,7 @@ const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|mi
 
 const TOKEN_SYNONYMS = new Map([
   ['zucchetti', 'zucchini'],
+  ['courgette', 'zucchini'],
   ['paprika', 'peperoni'],
   ['pepperoni', 'peperoni'],
   ['moehren', 'karotten'],
@@ -63,9 +65,11 @@ const TOKEN_SYNONYMS = new Map([
   ['hahnchen', 'pouletbrust'],
   ['chicken', 'pouletbrust'],
   ['rinds', 'rindfleisch'],
+  ['rind', 'rindfleisch'],
   ['lachsfilet', 'lachs'],
   ['forellenfilet', 'forelle'],
   ['thunfischfilet', 'thunfisch'],
+  ['thun', 'thunfisch'],
   ['pasta', 'vollkornpasta'],
   ['nudeln', 'vollkornpasta'],
   ['susskartoffeln', 'suesskartoffeln'],
@@ -79,7 +83,8 @@ const TOKEN_SYNONYMS = new Map([
   ['rinderhack', 'rindfleisch'],
   ['thunfischsteak', 'thunfisch'],
   ['rindsentrecote', 'rindfleisch'],
-  ['pouletgeschnetzeltes', 'pouletbrust']
+  ['pouletgeschnetzeltes', 'pouletbrust'],
+  ['veggiehack', 'linsen']
 ]);
 
 export const INGREDIENT_TAXONOMY = {
@@ -105,18 +110,21 @@ function sanitizeRaw(input) {
 
 function removeUnits(input) {
   return input
-    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose)\b/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose|glas|schale|becher)\b/g, ' ')
     .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
-    .replace(/\b(ca\.?|ab|nur|statt|pro|per)\b/g, ' ')
-    .replace(/\b(kaliber|klasse|gr\.|gross|klein|mittel|aktion|sonderpreis)\b/g, ' ');
+    .replace(/\b(ca\.?|ab|nur|statt|pro|per|je|nur heute|solange vorrat)\b/g, ' ')
+    .replace(/\b(chf|fr\.?|preis|statt\s*chf\s*\d+)\b/g, ' ')
+    .replace(/\b(kaliber|klasse|gr\.?|gross|klein|mittel|aktion|sonderpreis|promo|wochenhit)\b/g, ' ')
+    .replace(/\b\d{1,3}%\b/g, ' ');
 }
 
 function cleanCandidate(original) {
   return original
-    .split(/[\/,;+]/)[0]
+    .replace(/[\/,;+]/g, ' ')
     .replace(/[|•·:;]+/g, ' ')
     .replace(/\([^)]*\)/g, ' ')
-    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini|Natur|Nature)\b/gi, '')
+    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini|Natur|Nature|Top\s*Deal|Wochenhit)\b/gi, '')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
