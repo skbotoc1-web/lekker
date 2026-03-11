@@ -238,19 +238,36 @@ export function createServer() {
   app.get('/api/menu/today', (_, res) => {
     const today = getTodayDayString();
     const state = getTodayMenuState({ today });
+    const fallback = getDisplayMenu({ today });
 
     if (state.state === 'missing') {
-      return res.status(404).json({ error: 'Für heute ist noch kein Menü vorhanden.', day: today, state: 'missing' });
+      return res.status(404).json({
+        error: 'Für heute ist noch kein Menü vorhanden.',
+        day: today,
+        state: 'missing',
+        fallback: fallback ? { mode: fallback.mode, menu: fallback.menu } : null
+      });
     }
 
     if (state.state === 'preparing') {
-      return res.status(409).json({ error: 'Heute wird noch vorbereitet.', day: today, state: 'preparing' });
+      return res.status(409).json({
+        error: 'Heute wird noch vorbereitet.',
+        day: today,
+        state: 'preparing',
+        recipeCoverage: { expected: EXPECTED_RECIPE_COUNT, actual: state.menu.recipe_count },
+        fallback: fallback ? { mode: fallback.mode, menu: fallback.menu } : null
+      });
     }
 
     const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(state.menu.id)
       .map(normalizeRecipeRow);
 
-    return res.json({ menu: state.menu, recipes, state: state.state });
+    return res.json({
+      menu: state.menu,
+      recipes,
+      state: state.state,
+      recipeCoverage: { expected: EXPECTED_RECIPE_COUNT, actual: state.menu.recipe_count }
+    });
   });
 
   app.get('/api/weekly-plan', (req, res) => {

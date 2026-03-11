@@ -30,6 +30,7 @@ test('review endpoint validates action query param', async () => {
 test('api menu today returns 409 for incomplete selected menu', async () => {
   const day = '2099-12-30';
   db.prepare('DELETE FROM approvals').run();
+  db.prepare('DELETE FROM approvals').run();
   db.prepare('DELETE FROM recipes').run();
   db.prepare('DELETE FROM menus').run();
 

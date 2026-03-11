@@ -53,6 +53,7 @@ test('homepage falls back to previous complete menu when today is incomplete', a
   const previous = prevDate.toISOString().slice(0, 10);
 
   db.prepare('DELETE FROM approvals').run();
+  db.prepare('DELETE FROM approvals').run();
   db.prepare('DELETE FROM recipes').run();
   db.prepare('DELETE FROM menus').run();
 

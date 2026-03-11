@@ -131,6 +131,31 @@ h2 {
   font-weight: 600;
 }
 
+.prep-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #cbd8f3;
+  background: #f6f9ff;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.ghost-btn:hover {
+  background: #edf3ff;
+  color: var(--text);
+}
+
 .status-row {
   display: flex;
   flex-wrap: wrap;

@@ -18,6 +18,8 @@ Ziel: Findings zentral pflegen, Ownership klar machen, Status transparent halten
 | UX-001 | Usability | High | Design | verify | `draft` wurde zu schwach kommuniziert | Draft-Hinweis + Rezeptstatus-Badges aktiv | User versteht Entwurf vs verfügbar |
 | UX-002 | Error State | Medium | Design+Dev | done | "Rezept nicht gefunden" ohne Recovery-UX | Error-Card mit Rückwegen umgesetzt | Fehlerseite hat klare nächste Schritte |
 | QA-004 | Validation UX | Medium | Dev | done | `/review/:token` bei invalid action/token war generisch | Explizite Validierungszustände implementiert | Nutzer erhält verständliche Fehlermeldung |
+| QA-005 | Teststabilität/CI | Medium | Dev | todo | `npm test` meldet 2 FK-Constraint-Failures (intermittierend) bei globalen Cleanups | Tests auf isolierte DB oder robuste Cleanup-Strategie inkl. abhängiger Tabellen; optional Test-Serialisierung | Test-Suite läuft stabil 100% grün |
+| QA-006 | API/Docs Usability | Low | Dev+Design | todo | Feed-Tabs sind nicht selbsterklärend (`menus`, `offers_raw`, `offers_clustered`, `recipes`) – generische Requests führen zu 404 | Doku + UI-Hinweise (z. B. `/status` oder `/api/status` mit verfügbaren Feed-Tabs) | API-Nutzung ohne Trial-and-Error möglich |
 
 ## Referenzen
 - QA Gesamtbericht: `QA_REPORT_2026-03-11.md`
@@ -27,3 +29,4 @@ Ziel: Findings zentral pflegen, Ownership klar machen, Status transparent halten
 ## Übergabe-Log
 - 2026-03-11 18:33 UTC – Initiales Board durch Senior QA erstellt.
 - 2026-03-11 19:12 UTC – Findings aus `FEEDBACK_DEVELOPER_2026-03-11.md` umgesetzt und Status aktualisiert.
+- 2026-03-11 19:14 UTC – QA-Retest durchgeführt (UI/API/Review ok), neuer CI-Punkt QA-005 ergänzt.
