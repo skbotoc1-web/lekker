@@ -76,6 +76,6 @@ async function runRecipes(day) {
   const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
   if (!menu) throw new Error('No menu found for day');
   const recipes = generateRecipesForMenu(menu);
-  const sink = await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps]));
+  const sink = await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps, r.meta]));
   return { ok: true, stage: 'recipes', day, count: recipes.length, sink };
 }

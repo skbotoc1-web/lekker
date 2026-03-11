@@ -46,6 +46,7 @@ Leichtgewichtige WebApp für den Schweizer Markt: tägliche Menüvorschläge (ve
 - [x] Clustering + Kategoriezuordnung
 - [x] Menügenerator (Protein, Vegan/Omni, CO2, Anti-Wiederholung)
 - [x] Rezeptgenerator
+- [x] Premium-Rezeptformat (Portionen, Tipps, Zeit, Schwierigkeit, kcal, CO₂-Ampel)
 - [x] Freigabe-Workflow (Token-Link)
 - [x] Web-UI + JSON-API
 - [x] Scheduler + Full Pipeline

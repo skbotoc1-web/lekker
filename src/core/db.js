@@ -8,6 +8,15 @@ fs.mkdirSync(dbDir, { recursive: true });
 
 export const db = new Database(config.data.dbPath);
 
+function ensureColumns(table, columns) {
+  const existing = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing.includes(name)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+  }
+}
+
 export function migrate() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS offers (
@@ -53,6 +62,7 @@ export function migrate() {
       title TEXT NOT NULL,
       ingredients TEXT NOT NULL,
       steps TEXT NOT NULL,
+      meta TEXT NOT NULL DEFAULT '{}',
       FOREIGN KEY(menu_id) REFERENCES menus(id)
     );
 
@@ -72,4 +82,8 @@ export function migrate() {
       created_at TEXT NOT NULL
     );
   `);
+
+  ensureColumns('recipes', {
+    meta: "TEXT NOT NULL DEFAULT '{}'"
+  });
 }
