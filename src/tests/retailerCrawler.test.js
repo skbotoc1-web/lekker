@@ -31,3 +31,13 @@ test('parseRetailerHtml returns normalized ingredient list with min 10 items', (
   assert.ok(names.includes('Pouletbrust'));
   assert.ok(names.includes('Haferflocken'));
 });
+
+test('all retailer parsers produce deduplicated top 10 offers', () => {
+  const ids = ['migros', 'coop', 'aldi', 'lidl'];
+  for (const id of ids) {
+    const out = parseRetailerHtml(sampleHtml, id);
+    assert.equal(out.length, 10);
+    const uniq = new Set(out.map(x => x.item));
+    assert.equal(uniq.size, out.length);
+  }
+});

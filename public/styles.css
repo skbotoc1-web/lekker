@@ -316,6 +316,26 @@ td {
   margin-top: 1rem;
 }
 
+.meta-inline {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.recipe-index-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+
+.recipe-index-card h3 {
+  margin: 0.2rem 0 0.4rem;
+}
+
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 code {
   background: #eef2ff;
   border: 1px solid #d8e0ff;
