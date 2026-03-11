@@ -6,7 +6,7 @@ const STOPWORDS = [
 ];
 
 const RETAILER_NOISE = /\b(migros|coop|aldi|lidl|supermarkt|marktfrisch|aktionen)\b/i;
-const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service)\b/i;
+const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service|lieferung|abholung)\b/i;
 
 const KNOWN_INGREDIENTS = [
   { re: /\bhafer[-\s]?(fl|)ocken?\b/i, canonical: 'Haferflocken', veganLikely: true, categoryHint: 'fruehstueck' },
@@ -37,14 +37,14 @@ const KNOWN_INGREDIENTS = [
   { re: /\brind(?!en)|rinds|rindfleisch|rindshack\b/i, canonical: 'Rindfleisch', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\blachs(?:filet)?\b/i, canonical: 'Lachs', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\bforelle(?:nfilet|filet)?\b/i, canonical: 'Forelle', veganLikely: false, categoryHint: 'abendessen' },
-  { re: /\bthunfisch(?:filet)?\b/i, canonical: 'Thunfisch', veganLikely: false, categoryHint: 'abendessen' },
+  { re: /\bthunfisch(?:filet|steak)?\b/i, canonical: 'Thunfisch', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\beier?|ei\b/i, canonical: 'Eier', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bskyr\b/i, canonical: 'Skyr', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bjoghurt\b/i, canonical: 'Naturjoghurt', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\b(kaese|käse|mozzarella|feta|huettenkaese|hüttenkäse)\b/i, canonical: 'Käse', veganLikely: false, categoryHint: 'snack' }
 ];
 
-const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|milch|drink|fisch|fleisch|protein|bio|frisch|filet)\b/i;
+const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|milch|drink|fisch|fleisch|protein|bio|frisch|filet|nature|natur)\b/i;
 
 const TOKEN_SYNONYMS = new Map([
   ['zucchetti', 'zucchini'],
@@ -77,7 +77,9 @@ const TOKEN_SYNONYMS = new Map([
   ['filet', 'filet'],
   ['brustfilet', 'pouletbrust'],
   ['rinderhack', 'rindfleisch'],
-  ['thunfischsteak', 'thunfisch']
+  ['thunfischsteak', 'thunfisch'],
+  ['rindsentrecote', 'rindfleisch'],
+  ['pouletgeschnetzeltes', 'pouletbrust']
 ]);
 
 export const INGREDIENT_TAXONOMY = {
@@ -103,15 +105,15 @@ function sanitizeRaw(input) {
 
 function removeUnits(input) {
   return input
-    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?)\b/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose)\b/g, ' ')
     .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
     .replace(/\b(ca\.?|ab|nur|statt|pro|per)\b/g, ' ')
-    .replace(/\b(kaliber|klasse|gr\.|gross|klein|mittel)\b/g, ' ');
+    .replace(/\b(kaliber|klasse|gr\.|gross|klein|mittel|aktion|sonderpreis)\b/g, ' ');
 }
 
 function cleanCandidate(original) {
   return original
-    .split(/[\/,+]/)[0]
+    .split(/[\/,;+]/)[0]
     .replace(/[|•·:;]+/g, ' ')
     .replace(/\([^)]*\)/g, ' ')
     .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini|Natur|Nature)\b/gi, '')
@@ -215,4 +217,45 @@ export function harmonizeIngredients(rawItems = []) {
       return scoreB - scoreA;
     })
     .map(x => ({ ...x, sources: [...x.sources] }));
+}
+
+export function harmonizeIngredientCandidates(candidates = []) {
+  const grouped = new Map();
+
+  for (const candidate of candidates) {
+    const raw = typeof candidate === 'string' ? candidate : candidate?.value;
+    const sourceTag = typeof candidate === 'string' ? 'unknown' : (candidate?.sourceTag || 'unknown');
+    const n = normalizeIngredient(raw);
+    if (!n) continue;
+
+    const key = n.canonical;
+    const entry = grouped.get(key) || {
+      canonical: n.canonical,
+      token: canonicalToken(n.canonical),
+      taxonomy: n.taxonomy,
+      veganLikely: n.veganLikely,
+      categoryHint: n.categoryHint,
+      mentions: 0,
+      maxConfidence: n.confidence,
+      rawSources: new Set(),
+      sourceTags: new Set()
+    };
+
+    entry.mentions += 1;
+    entry.maxConfidence = Math.max(entry.maxConfidence, n.confidence);
+    entry.rawSources.add(n.source);
+    entry.sourceTags.add(sourceTag);
+    if (entry.veganLikely == null) entry.veganLikely = n.veganLikely;
+    if (!entry.categoryHint) entry.categoryHint = n.categoryHint;
+
+    grouped.set(key, entry);
+  }
+
+  return [...grouped.values()]
+    .map(x => ({ ...x, sources: [...x.rawSources], sourceTags: [...x.sourceTags] }))
+    .sort((a, b) => {
+      const scoreA = a.mentions * 2 + a.maxConfidence + a.sourceTags.length * 0.2;
+      const scoreB = b.mentions * 2 + b.maxConfidence + b.sourceTags.length * 0.2;
+      return scoreB - scoreA;
+    });
 }

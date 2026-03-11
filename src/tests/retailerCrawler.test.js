@@ -84,6 +84,17 @@ test('json-ld offers are considered as extraction fallback', () => {
   assert.equal(out.includes('Lachs'), true);
 });
 
+test('__NEXT_DATA__ json extraction works as fallback for modern retailer pages', () => {
+  const html = `
+    <script id="__NEXT_DATA__" type="application/json">
+      {"props":{"pageProps":{"products":[{"name":"Zucchetti frisch"},{"name":"Rinds Hack 2 x 500g"}]}}}
+    </script>
+  `;
+  const out = parseRetailerHtml(html, 'aldi').map(x => x.item);
+  assert.equal(out.includes('Zucchini'), true);
+  assert.equal(out.includes('Rindfleisch'), true);
+});
+
 test('retailer parser removes heading noise and still keeps strong ingredient hits', () => {
   const html = `
     <h2>Angebote dieser Woche</h2>
@@ -97,4 +108,17 @@ test('retailer parser removes heading noise and still keeps strong ingredient hi
   assert.equal(items.includes('Brokkoli'), true);
   assert.equal(items.includes('Rindfleisch'), true);
   assert.equal(items.includes('Angebote dieser Woche'), false);
+});
+
+test('scraper output contract is stable for all retailers', () => {
+  const ids = ['migros', 'coop', 'aldi', 'lidl'];
+  for (const id of ids) {
+    const out = parseRetailerHtml(sampleHtml, id);
+    assert.equal(out.length, 10);
+    for (const row of out) {
+      assert.equal(typeof row.item, 'string');
+      assert.equal(typeof row.source, 'string');
+      assert.ok(row.confidence >= 0 && row.confidence <= 1);
+    }
+  }
 });

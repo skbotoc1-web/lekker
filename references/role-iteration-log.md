@@ -107,3 +107,19 @@ Integration Review:
 - Retailer-Scrapes für Migros/Coop/Aldi/Lidl sind resilienter gegen Dubletten und Header-Rauschen.
 - Ingredient-Harmonisierung und Menü-Matching sind stärker auf echte Angebotslage ausgerichtet.
 - SEO/UX-Erweiterungen bleiben aktiv, Plattform weiterhin schlank (SSR/SQLite, keine neuen Laufzeitpakete).
+
+## Iteration 8
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Night-Loop strikt auf Impact priorisiert: bessere Händlerdatenqualität + bessere Menütreffer + bestehende SEO/UX-Flächen stabil halten | übergreifende Änderungen können Regressionen erzeugen | genau ein integrierter Loop mit vollständigem Test-Gate |
+| CTO | Retailer-Extraktion vertieft: zusätzliche Selektoren je Händler, JSON-LD + `__NEXT_DATA__` Fallback, Source-Tag-Ranking, robustere Noise-/Dedup-Strategie | scraper drift / noisy payloads | Multi-Source Scoring + confidence-basierte Selektion + Fill-up Fallback |
+| CFO | Lightweight-Prinzip eingehalten: keine neuen Dependencies, nur bestehende Services/Tests erweitert | Heuristikkomplexität wächst | kleine modulare Funktionen, klare Contract-Tests als Kostenbremse |
+| Designer | Bestehende Intent-Hub/Cluster/Index/Print-UX bestätigt und intern verlinkt belassen (keine neue UI-Schwere) | wenig visuell neuer Scope | Fokus auf Inhaltsqualität + Conversionpfad statt zusätzlicher UI-Schicht |
+| Nutrition Lead | Harmonisierung ausgebaut: stärkere Synonyme, Unit-Cleanup, Source-aware Kandidaten-Harmonisierung, bessere Canonical-/Taxonomie-Konsistenz | Fehlklassifikation bei Randbegriffen | bekannte Canonicals priorisieren, Soft-Food-Fallback konservativ belassen |
+| AgentOps Lead | Validierung erweitert: Scraper-Output-Contract, `__NEXT_DATA__` Fallback-Test, source-tag Harmonisierung, erweitertes Matching-Coverage-Testset | längere Tests | kleine Fixtures, Testlaufzeit weiterhin schlank (~3s) |
+
+Integration Review:
+- Retailer-Pipeline (Migros/Coop/Aldi/Lidl) nutzt jetzt robustere Selektor- und JSON-Fallback-Ketten mit Source-gewichteter Auswahl.
+- Ingredient-Normalisierung/Harmonisierung wurde um source-aware Dedup und zusätzliche Synonyme erweitert; Matching trifft Angebotslage zuverlässiger.
+- SEO/UX-Elemente bleiben aktiv (Intent-Landing, Cluster, strukturierte Daten, Linkhubs, Freshness, Print/Export), Plattform bleibt leichtgewichtig (SSR + SQLite, 0 neue Runtime-Dependencies).

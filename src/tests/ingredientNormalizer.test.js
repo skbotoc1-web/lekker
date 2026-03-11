@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalToken, normalizeIngredient, harmonizeIngredients, ingredientCategory } from '../services/ingredientNormalizer.js';
+import { canonicalToken, normalizeIngredient, harmonizeIngredients, harmonizeIngredientCandidates, ingredientCategory } from '../services/ingredientNormalizer.js';
 
 test('normalizeIngredient maps common aliases to canonical forms', () => {
   const a = normalizeIngredient('Bio Kicher-Erbsen 500g');
@@ -58,4 +58,19 @@ test('normalizer handles mixed retailer labels and delimiter-heavy text', () => 
   assert.equal(a?.canonical, 'Skyr');
   assert.equal(b?.canonical, 'Peperoni');
   assert.equal(c?.canonical, 'Rindfleisch');
+});
+
+test('harmonizeIngredientCandidates keeps source tags for stronger fallback ranking', () => {
+  const out = harmonizeIngredientCandidates([
+    { value: 'Bio Brokkoli 500g', sourceTag: 'selector:article h2' },
+    { value: 'Brokkoli', sourceTag: 'attr:data' },
+    { value: 'Brokkoli', sourceTag: 'application/ld+json' },
+    { value: 'Angebote dieser Woche', sourceTag: 'selector:h2' }
+  ]);
+
+  const broccoli = out.find(x => x.canonical === 'Brokkoli');
+  assert.ok(broccoli);
+  assert.equal(broccoli.mentions, 3);
+  assert.ok(broccoli.sourceTags.includes('application/ld+json'));
+  assert.ok(broccoli.sourceTags.includes('attr:data'));
 });

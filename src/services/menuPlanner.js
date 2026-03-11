@@ -72,6 +72,8 @@ function norm(value) {
 }
 
 function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, slot, optionType) {
+  let matchedKeywords = 0;
+
   const keywordScore = dish.keywords.reduce((score, kw) => {
     const key = norm(kw);
     const direct = offerIndex.get(key) || 0;
@@ -81,16 +83,22 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, slot, o
     }
 
     const base = direct + fuzzy;
+    if (base > 0.2) matchedKeywords += 1;
+
     const proteinBoost = PROTEIN_KEYS.has(key) ? 1.4 : 1;
-    const slotBoost = slot === 'abendessen' && PROTEIN_KEYS.has(key) ? 1.2 : 1;
+    const dinnerProteinBoost = slot === 'abendessen' && PROTEIN_KEYS.has(key) ? 1.2 : 1;
     const taxonomy = ingredientCategory(kw.charAt(0).toUpperCase() + kw.slice(1));
-    const categoryBoost = (categoryIndex.get(taxonomy) || 0) > 0 ? 1.12 : 1;
-    return score + (base * proteinBoost * slotBoost * categoryBoost);
+    const taxonomyPresence = categoryIndex.get(taxonomy) || 0;
+    const categoryBoost = taxonomyPresence > 0 ? 1.12 + Math.min(0.1, taxonomyPresence * 0.02) : 1;
+    return score + (base * proteinBoost * dinnerProteinBoost * categoryBoost);
   }, 0);
+
+  const coverage = dish.keywords.length ? matchedKeywords / dish.keywords.length : 0;
+  const coverageBoost = coverage * 1.8;
 
   const slotBoost = slotSignals.get(`${slot}:${optionType}`) || 0;
   const neutralSlotBoost = slotSignals.get(`${slot}:any`) || 0;
-  return keywordScore + (slotBoost * 0.9) + (neutralSlotBoost * 0.35);
+  return keywordScore + coverageBoost + (slotBoost * 0.9) + (neutralSlotBoost * 0.35);
 }
 
 function buildOfferIndex(day) {

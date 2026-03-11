@@ -58,3 +58,17 @@ test('menu planner uses slot+vegan signals to choose offer-aligned vegan lunch',
   const menu = createDailyMenu(day);
   assert.equal(menu.vegan_lunch, 'Kichererbsen-Curry mit Naturreis');
 });
+
+test('menu planner favors high keyword coverage from harmonized omni offers', () => {
+  const day = '2026-03-17';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'mittagessen', 0, 'Pouletbrust', 'coop');
+  insert.run(day, 'mittagessen', 0, 'Quinoa', 'coop');
+  insert.run(day, 'mittagessen', 0, 'Gurken', 'migros');
+  insert.run(day, 'mittagessen', 0, 'Tomaten', 'migros');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_lunch, 'Poulet-Quinoa-Salat');
+});
