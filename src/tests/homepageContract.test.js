@@ -7,9 +7,17 @@ import { getTodayDayString } from '../repositories/menuRepository.js';
 
 migrate();
 
+function cleanupMenuDay(day) {
+  db.prepare('DELETE FROM approvals WHERE menu_id IN (SELECT id FROM menus WHERE day=?)').run(day);
+  db.prepare('DELETE FROM recipes WHERE menu_id IN (SELECT id FROM menus WHERE day=?)').run(day);
+  db.prepare('DELETE FROM menus WHERE day=?').run(day);
+}
+
 function insertMenu(day, status = 'draft') {
+  cleanupMenuDay(day);
+
   db.prepare(`
-    INSERT OR REPLACE INTO menus (
+    INSERT INTO menus (
       day, vegan_breakfast, vegan_lunch, vegan_dinner, vegan_snack, vegan_drink,
       omni_breakfast, omni_lunch, omni_dinner, omni_snack, omni_drink, co2_score, status, created_at
     ) VALUES (?, 'VB', 'VL', 'VD', 'VS', 'VG', 'OB', 'OL', 'OD', 'OS', 'OG', 1.8, ?, ?)
@@ -44,6 +52,7 @@ test('homepage falls back to previous complete menu when today is incomplete', a
   prevDate.setUTCDate(prevDate.getUTCDate() - 1);
   const previous = prevDate.toISOString().slice(0, 10);
 
+  db.prepare('DELETE FROM approvals').run();
   db.prepare('DELETE FROM recipes').run();
   db.prepare('DELETE FROM menus').run();
 

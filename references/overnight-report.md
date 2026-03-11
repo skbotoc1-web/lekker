@@ -40,9 +40,9 @@
   - Weekly-Plan Repetition-Statistik
 
 ## Remaining gaps
-- Keine E2E-HTTP-Contract-Tests für `/api/status` und `/api/weekly-plan` Response-Struktur.
 - Repetition derzeit nur sichtbar, nicht aktiv optimierend in Menüauswahl.
 - SEO-Meta noch ohne feinere OpenGraph-Varianten pro Seitentyp.
+- Approval-Flow hat jetzt Publish-Gate für Vollständigkeit, aber noch keine explizite Retry-UI für Reviewer.
 
 ## Next 3 high-impact tasks
 1. **Repetition-aware Menügenerator**: Auswahl aktiv gegen häufige Wiederholungen optimieren (nicht nur anzeigen).

@@ -60,6 +60,7 @@ function menuCards(menu, recipeLookup = new Set()) {
     <span>Rezepte: <strong>${recipeCount}/${EXPECTED_RECIPE_COUNT}</strong></span>
   </section>
   ${menu.status !== 'published' ? '<p class="draft-hint">Dieses Menü ist ein Entwurf. Einzelne Rezepte können noch fehlen.</p>' : ''}
+  ${!isComplete ? `<div class="prep-actions"><a class="ghost-btn" href="/menue">Archiv ansehen</a><a class="ghost-btn" href=".">Später erneut laden</a></div>` : ''}
   <section class="grid" aria-label="Menüoptionen">
     <article class="card">
       <h2>🌱 Vegan</h2>
@@ -146,12 +147,35 @@ export function createServer() {
     if (tab === 'menu-today' && ext === 'json') {
       const today = getTodayDayString();
       const state = getTodayMenuState({ today });
-      if (state.state === 'missing') return res.status(404).json({ error: 'Noch kein Menü für heute verfügbar.', day: today, state: 'missing' });
-      if (state.state === 'preparing') return res.status(409).json({ error: 'Heute wird noch vorbereitet.', day: today, state: 'preparing' });
+      const fallback = getDisplayMenu({ today });
+
+      if (state.state === 'missing') {
+        return res.status(404).json({
+          error: 'Noch kein Menü für heute verfügbar.',
+          day: today,
+          state: 'missing',
+          fallback: fallback ? { mode: fallback.mode, menu: fallback.menu } : null
+        });
+      }
+
+      if (state.state === 'preparing') {
+        return res.status(409).json({
+          error: 'Heute wird noch vorbereitet.',
+          day: today,
+          state: 'preparing',
+          recipeCoverage: { expected: EXPECTED_RECIPE_COUNT, actual: state.menu.recipe_count },
+          fallback: fallback ? { mode: fallback.mode, menu: fallback.menu } : null
+        });
+      }
 
       const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(state.menu.id)
         .map(normalizeRecipeRow);
-      return res.json({ menu: state.menu, recipes, state: state.state });
+      return res.json({
+        menu: state.menu,
+        recipes,
+        state: state.state,
+        recipeCoverage: { expected: EXPECTED_RECIPE_COUNT, actual: state.menu.recipe_count }
+      });
     }
 
     const allowedExt = ['csv', 'jsonl'];
@@ -198,7 +222,7 @@ export function createServer() {
       db.prepare("UPDATE menus SET status='draft' WHERE day=?").run(today);
     }
 
-    const statusCode = result.ok ? 200 : 404;
+    const statusCode = result.ok ? 200 : (result.code === 'INCOMPLETE_MENU' ? 409 : 404);
     return res.status(statusCode).send(htmlLayout({
       title: 'Review Ergebnis | lekker',
       description: 'Freigabestatus für Tagesmenü',

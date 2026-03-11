@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { config } from '../core/config.js';
 import { db } from '../core/db.js';
 import { log } from '../core/logger.js';
+import { hasCompleteSet, EXPECTED_RECIPE_COUNT, getRecipeCount } from '../repositories/recipeRepository.js';
 
 export async function sendApprovalMail(menu) {
   const token = crypto.randomBytes(24).toString('hex');
@@ -50,6 +51,15 @@ export function handleReview(token, action) {
   db.prepare('UPDATE approvals SET action=?, acted_at=? WHERE token=?').run(action, new Date().toISOString(), token);
 
   if (action === 'approve') {
+    if (!hasCompleteSet(row.menu_id)) {
+      const actual = getRecipeCount(row.menu_id);
+      return {
+        ok: false,
+        code: 'INCOMPLETE_MENU',
+        message: `Freigabe blockiert: Menü ist unvollständig (${actual}/${EXPECTED_RECIPE_COUNT} Rezepte).`
+      };
+    }
+
     db.prepare("UPDATE menus SET status='published' WHERE id=?").run(row.menu_id);
     return { ok: true, message: 'Menü freigegeben und publiziert.' };
   }

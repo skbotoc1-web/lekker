@@ -29,6 +29,7 @@ test('review endpoint validates action query param', async () => {
 
 test('api menu today returns 409 for incomplete selected menu', async () => {
   const day = '2099-12-30';
+  db.prepare('DELETE FROM approvals').run();
   db.prepare('DELETE FROM recipes').run();
   db.prepare('DELETE FROM menus').run();
 
@@ -43,6 +44,16 @@ test('api menu today returns 409 for incomplete selected menu', async () => {
   assert.equal([404, 409].includes(res.status), true);
   const json = await res.json();
   assert.equal(typeof json.error, 'string');
+});
+
+test('api status returns contract fields', async () => {
+  const res = await fetch(`${baseUrl}/api/status`);
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(typeof json.ok, 'boolean');
+  assert.equal(typeof json.generatedAt, 'string');
+  assert.equal(typeof json.runHealth?.sampleSize, 'number');
+  assert.equal(Array.isArray(json.latestRuns), true);
 });
 
 test('intent landing page and print export are available', async () => {
