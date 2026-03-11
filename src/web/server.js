@@ -5,11 +5,10 @@ import { db } from '../core/db.js';
 import { handleReview } from '../services/approvalService.js';
 import { runHook } from '../hooks/pipelineHooks.js';
 import { getWeeklyPlan } from '../services/weeklyPlan.js';
+import { getDisplayMenu, getTodayMenuState, getTodayDayString } from '../repositories/menuRepository.js';
+import { EXPECTED_RECIPE_COUNT, getRecipeLookup } from '../repositories/recipeRepository.js';
 
-const TZ = 'Europe/Zurich';
 const FEEDS_DIR = path.resolve('data/feeds');
-const RECIPE_SLOTS = ['fruehstueck', 'mittagessen', 'abendessen', 'snack', 'drink'];
-const EXPECTED_RECIPE_COUNT = RECIPE_SLOTS.length * 2;
 
 function htmlLayout({ title, description, canonical, body, jsonLd }) {
   return `<!doctype html>
@@ -41,17 +40,8 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
 </html>`;
 }
 
-function recipeKey(option, slot) {
-  return `${option}:${slot}`;
-}
-
-function getRecipeLookup(menuId) {
-  const rows = db.prepare('SELECT option_type, meal_slot FROM recipes WHERE menu_id=?').all(menuId);
-  return new Set(rows.map(r => recipeKey(r.option_type, r.meal_slot)));
-}
-
 function recipeCta(day, lookup, option, slot) {
-  if (!lookup.has(recipeKey(option, slot))) {
+  if (!lookup.has(`${option}:${slot}`)) {
     return `<span class="recipe-pending" aria-label="Rezept folgt">Rezept folgt</span>`;
   }
   return `<a class="recipe-link" href="/rezept/${option}/${day}/${slot}">Rezept</a>`;
@@ -95,7 +85,7 @@ function menuCards(menu, recipeLookup = new Set()) {
 }
 
 function getDayToday() {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
+  return getTodayDayString();
 }
 
 function normalizeRecipeRow(row) {
@@ -126,25 +116,12 @@ function difficultyLabel(value) {
   return 'fortgeschritten';
 }
 
-function pickHomepageMenu() {
-  const today = getDayToday();
-  const rows = db.prepare(`
-    SELECT m.*, (
-      SELECT COUNT(*) FROM recipes r WHERE r.menu_id = m.id
-    ) AS recipe_count
-    FROM menus m
-    WHERE m.day <= ?
-    ORDER BY m.day DESC
-  `).all(today);
+function renderInfoState({ title, message, backLinks = [] }) {
+  const links = backLinks.length
+    ? `<nav class='inline-links'>${backLinks.map(l => `<a href='${l.href}'>${l.label}</a>`).join('')}</nav>`
+    : '';
 
-  if (!rows.length) return null;
-  const todayComplete = rows.find(r => r.day === today && r.recipe_count >= EXPECTED_RECIPE_COUNT);
-  if (todayComplete) return { menu: todayComplete, mode: 'today-complete' };
-
-  const latestComplete = rows.find(r => r.recipe_count >= EXPECTED_RECIPE_COUNT);
-  if (latestComplete) return { menu: latestComplete, mode: 'latest-complete' };
-
-  return { menu: rows[0], mode: 'latest-incomplete' };
+  return `<article class='card'><h1>${title}</h1><p class='lead'>${message}</p>${links}</article>`;
 }
 
 export function createServer() {
@@ -202,6 +179,20 @@ export function createServer() {
   app.get('/review/:token', (req, res) => {
     const { token } = req.params;
     const action = req.query.action;
+
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).send(htmlLayout({
+        title: 'Ungültige Review-Aktion | lekker',
+        description: 'Bitte approve oder reject verwenden.',
+        canonical: '/review',
+        body: renderInfoState({
+          title: 'Ungültige Aktion',
+          message: 'Die Aktion fehlt oder ist ungültig. Verwende den Review-Link mit action=approve oder action=reject.',
+          backLinks: [{ href: '/', label: 'Zur Startseite' }, { href: '/status', label: 'Status prüfen' }]
+        })
+      }));
+    }
+
     const result = handleReview(token, action);
 
     if (result.ok && action === 'reject') {
@@ -209,20 +200,31 @@ export function createServer() {
       db.prepare("UPDATE menus SET status='draft' WHERE day=?").run(today);
     }
 
-    return res.send(htmlLayout({
+    const statusCode = result.ok ? 200 : 404;
+    return res.status(statusCode).send(htmlLayout({
       title: 'Review Ergebnis | lekker',
       description: 'Freigabestatus für Tagesmenü',
       canonical: '/review',
-      body: `<h1>${result.message}</h1><p><a href='/'>Zur App</a></p>`
+      body: renderInfoState({
+        title: result.ok ? 'Review verarbeitet' : 'Token ungültig oder abgelaufen',
+        message: result.message,
+        backLinks: [{ href: '/', label: 'Zur App' }, { href: '/status', label: 'Status' }]
+      })
     }));
   });
 
   app.get('/api/menu/today', (_, res) => {
-    const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(getDayToday());
-    if (!menu) return res.status(404).json({ error: 'Noch kein Menü für heute verfügbar.' });
-    const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(menu.id)
+    const selected = getDisplayMenu();
+    if (!selected?.menu) return res.status(404).json({ error: 'Noch kein Menü verfügbar.' });
+
+    const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(selected.menu.id)
       .map(normalizeRecipeRow);
-    return res.json({ menu, recipes });
+
+    if (recipes.length < EXPECTED_RECIPE_COUNT) {
+      return res.status(409).json({ error: 'Menü ist noch in Vorbereitung.', day: selected.menu.day, mode: selected.mode });
+    }
+
+    return res.json({ menu: selected.menu, recipes, mode: selected.mode });
   });
 
   app.get('/api/weekly-plan', (req, res) => {
@@ -296,7 +298,18 @@ export function createServer() {
 
   app.get('/menue/:day', (req, res) => {
     const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(req.params.day);
-    if (!menu) return res.status(404).send('Menü nicht gefunden.');
+    if (!menu) {
+      return res.status(404).send(htmlLayout({
+        title: 'Menü nicht gefunden | lekker',
+        description: 'Das angefragte Menü existiert nicht.',
+        canonical: '/menue',
+        body: renderInfoState({
+          title: 'Dieses Menü ist nicht verfügbar',
+          message: 'Möglicherweise ist das Datum falsch oder das Menü wurde noch nicht erzeugt.',
+          backLinks: [{ href: '/menue', label: 'Zum Menü-Archiv' }, { href: '/', label: 'Zur Startseite' }]
+        })
+      }));
+    }
 
     const recipeLookup = getRecipeLookup(menu.id);
 
@@ -412,7 +425,7 @@ export function createServer() {
   });
 
   app.get('/', (_, res) => {
-    const selected = pickHomepageMenu();
+    const selected = getDisplayMenu();
 
     if (!selected?.menu) {
       return res.send(htmlLayout({
