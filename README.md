@@ -73,6 +73,8 @@ git clone <repo-url> && cd lekker && ./scripts/deploy.sh
 ## API
 
 - `GET /api/menu/today` – Tagesmenü + Rezepte
+- `GET /api/weekly-plan?days=7` – Wochenplan + Repetition-Statistik (3–14 Tage)
+- `GET /api/status` – Laufstatus und Health der letzten Pipeline-Runs
 - `GET /review/:token?action=approve|reject` – Freigabe/Zurückweisung
 - `GET /health`
 - `POST /hooks/run/:stage` – Hook Runner (`ingestion|clustering|menu|recipes|full`)
@@ -97,6 +99,32 @@ npm run hook:full
 
 Datensenke ist standardmässig **lokal** (`DATA_SINK=local`) und schreibt Feeds nach `data/feeds/*.csv|*.jsonl`.
 Optional kann auf Google Sheets umgestellt werden (`DATA_SINK=google`) mit Service Account.
+
+## Operations & Troubleshooting
+
+### Laufstatus
+
+- UI: `GET /status`
+- JSON: `GET /api/status`
+- Persistente Run-Historie: SQLite Tabelle `pipeline_runs`
+
+### Häufige Probleme
+
+1. **Menü vorhanden, aber Rezepte fehlen**
+   - Ursache: `recipes` Stage lief nicht oder fehlerhaft.
+   - Fix: `npm run hook:full` oder `POST /hooks/run/recipes` erneut ausführen.
+
+2. **Google Sink fehlschlägt**
+   - Bei `DATA_SINK=google` und Default `SINK_FALLBACK_TO_LOCAL=true` schreibt lekker automatisch lokal weiter.
+   - Logs auf Warnung `google_failed_fallback_local` prüfen.
+
+3. **Status bleibt auf draft**
+   - Review-Link wurde nicht approved oder es gab ein reject.
+   - `/review/:token?action=approve` verwenden oder Pipeline erneut laufen lassen.
+
+4. **Leere Wochenplan-Ansicht**
+   - Es existieren noch keine Menüs in der DB.
+   - Erste Daten mit `RUN_PIPELINE_ON_BOOT=true npm start` oder Hook triggern.
 
 ## Hinweise
 

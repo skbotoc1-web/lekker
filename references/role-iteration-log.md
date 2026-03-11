@@ -29,3 +29,18 @@ Integration Review:
 Integration Review:
 - UX klarer bei Entwurf/Komplettheit, bessere Lesbarkeit mobil + desktop
 - Anti-Repetition jetzt sichtbar statt implizit
+
+## Iteration 3
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO/Orchestrator | Betriebsstabilität und Trust-Transparenz als Release-Kriterium gesetzt | weniger sichtbare Feature-Arbeit | bewusst Ops-first für PMF-Reliability |
+| CTO | Run-Logging in Hooks (success/fail, Dauer, Details) integriert | zusätzlicher Schreibpfad | SQLite-append-only, minimal overhead |
+| CFO | `/status` + Troubleshooting README reduziert Supportzeit (OPEX) | Doku kann veralten | konkrete Symptome/Fixes dokumentiert |
+| Designer | Statusseite und Navigation in Informationsarchitektur eingebettet | mehr Navigationspunkte | auf Kernziele begrenzt |
+| Nutrition Lead | Qualitätsmetriken bleiben sichtbar in Rezeptseiten + Wochenplan-Kontext | Health-Fokus nicht vollständig klinisch | als MVP-Richtwerte klar markiert |
+| AgentOps Lead | `/api/status` mit Success-Ratio + letzten Runs; persistente `pipeline_runs` | false sense of health bei kleiner sample-size | sample-size explizit im Payload |
+
+Integration Review:
+- End-to-end deutlich robuster: Integrität + Sichtbarkeit + Troubleshooting
+- Hook-Orchestrierung und lokaler Feed-Fallback vollständig erhalten

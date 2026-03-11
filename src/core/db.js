@@ -81,6 +81,16 @@ export function migrate() {
       markdown TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS pipeline_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day TEXT NOT NULL,
+      stage TEXT NOT NULL,
+      ok INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      details TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL
+    );
   `);
 
   ensureColumns('recipes', {

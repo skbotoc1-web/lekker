@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate, db } from '../core/db.js';
-import { createMenuAndRecipesAtomic } from '../hooks/pipelineHooks.js';
+import { createMenuAndRecipesAtomic, runHook } from '../hooks/pipelineHooks.js';
 
 migrate();
 
@@ -20,4 +20,17 @@ test('createMenuAndRecipesAtomic creates complete menu + recipe coverage', () =>
 
   const count = db.prepare('SELECT COUNT(*) as c FROM recipes WHERE menu_id=?').get(out.menu.id).c;
   assert.equal(count, 10);
+});
+
+test('runHook writes pipeline_runs entries', async () => {
+  const before = db.prepare('SELECT COUNT(*) as c FROM pipeline_runs').get().c;
+  const out = await runHook('menu');
+  assert.equal(out.ok, true);
+
+  const after = db.prepare('SELECT COUNT(*) as c FROM pipeline_runs').get().c;
+  assert.equal(after, before + 1);
+
+  const latest = db.prepare('SELECT stage, ok FROM pipeline_runs ORDER BY id DESC LIMIT 1').get();
+  assert.equal(latest.stage, 'menu');
+  assert.equal(latest.ok, 1);
 });

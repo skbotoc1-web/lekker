@@ -322,10 +322,38 @@ export function createServer() {
   app.get('/rezept/:option/:day/:slot', (req, res) => {
     const { option, day, slot } = req.params;
     const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
-    if (!menu) return res.status(404).send('Menü nicht gefunden.');
+    if (!menu) {
+      return res.status(404).send(htmlLayout({
+        title: 'Menü nicht gefunden | lekker',
+        description: 'Das angefragte Menü existiert nicht oder ist nicht mehr verfügbar.',
+        canonical: `/rezept/${option}/${day}/${slot}`,
+        body: `<section class='card state-card'>
+          <h1>Dieses Menü ist nicht verfügbar</h1>
+          <p>Der angefragte Tag konnte nicht gefunden werden.</p>
+          <nav class='inline-links'>
+            <a href='/'>Zur Startseite</a>
+            <a href='/menue'>Zum Menü-Archiv</a>
+          </nav>
+        </section>`
+      }));
+    }
 
     const recipeRaw = db.prepare('SELECT * FROM recipes WHERE menu_id=? AND option_type=? AND meal_slot=?').get(menu.id, option, slot);
-    if (!recipeRaw) return res.status(404).send('Rezept nicht gefunden.');
+    if (!recipeRaw) {
+      return res.status(404).send(htmlLayout({
+        title: 'Rezept noch nicht verfügbar | lekker',
+        description: 'Dieses Rezept wird gerade vorbereitet.',
+        canonical: `/rezept/${option}/${day}/${slot}`,
+        body: `<section class='card state-card'>
+          <h1>Dieses Rezept ist noch nicht verfügbar</h1>
+          <p>Das Menü ist bereits sichtbar, aber dieses Rezept wird noch erstellt. Schau bitte in Kürze wieder vorbei.</p>
+          <nav class='inline-links'>
+            <a href='/menue/${day}'>Zurück zum Menü</a>
+            <a href='/menue'>Zum Archiv</a>
+          </nav>
+        </section>`
+      }));
+    }
 
     const recipe = normalizeRecipeRow(recipeRaw);
     const ingredients = recipe.ingredients.map(i => `<li>${i}</li>`).join('');
@@ -397,23 +425,24 @@ export function createServer() {
 
     const { menu, mode } = selected;
     const recipeLookup = getRecipeLookup(menu.id);
+    const isDraft = menu.status !== 'published';
 
     const heading =
-      mode === 'today-complete'
-        ? 'Tagesmenü Schweiz'
-        : mode === 'latest-complete'
-          ? 'Neuester fertiger Menüvorschlag'
-          : 'Menü in Vorbereitung';
+      isDraft
+        ? 'Neuster Entwurf'
+        : mode === 'today-complete'
+          ? 'Tagesmenü Schweiz'
+          : 'Neuester fertiger Menüvorschlag';
 
     const intro =
-      mode === 'today-complete'
-        ? '<p class="lead">Heute frisch kuratiert mit vollständigen Rezepten.</p>'
-        : mode === 'latest-complete'
-          ? `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`
-          : '<p class="lead">Das neueste Menü wird gerade finalisiert. Rezeptlinks werden automatisch sichtbar, sobald alles bereit ist.</p>';
+      isDraft
+        ? `<p class="lead">Entwurf vom <strong>${menu.day}</strong>. Einzelne Rezepte können noch fehlen.</p>`
+        : mode === 'today-complete'
+          ? '<p class="lead">Heute frisch kuratiert mit vollständigen Rezepten.</p>'
+          : `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`;
 
     res.send(htmlLayout({
-      title: mode === 'today-complete' ? `lekker – Tagesmenü ${menu.day}` : `lekker – Menü ${menu.day}`,
+      title: isDraft ? `lekker – Entwurf ${menu.day}` : (mode === 'today-complete' ? `lekker – Tagesmenü ${menu.day}` : `lekker – Menü ${menu.day}`),
       description: 'Protein-fokussierte Menüvorschläge für den Schweizer Markt mit klaren Rezeptstatus.',
       canonical: '/',
       body: `<h1>${heading}</h1>${intro}${menuCards(menu, recipeLookup)}<p><a href='/menue'>Vergangene Menüs ansehen →</a></p>`

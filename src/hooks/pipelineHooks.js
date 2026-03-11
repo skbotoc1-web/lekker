@@ -9,17 +9,36 @@ const TZ = 'Europe/Zurich';
 const EXPECTED_RECIPE_COUNT = 10;
 const dayStamp = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
 
+function persistRun({ day, stage, ok, durationMs, details }) {
+  db.prepare('INSERT INTO pipeline_runs (day, stage, ok, duration_ms, details, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(day, stage, ok ? 1 : 0, durationMs, JSON.stringify(details || {}), new Date().toISOString());
+}
+
+async function withRunLog(stage, day, fn) {
+  const startedAt = Date.now();
+  try {
+    const result = await fn();
+    persistRun({ day, stage, ok: true, durationMs: Date.now() - startedAt, details: result });
+    return result;
+  } catch (error) {
+    persistRun({ day, stage, ok: false, durationMs: Date.now() - startedAt, details: { error: error.message } });
+    throw error;
+  }
+}
+
 export async function runHook(stage) {
   const day = dayStamp();
-  if (stage === 'ingestion') return runIngestion(day);
-  if (stage === 'clustering') return runClustering(day);
-  if (stage === 'menu') return runMenu(day);
-  if (stage === 'recipes') return runRecipes(day);
+  if (stage === 'ingestion') return withRunLog('ingestion', day, () => runIngestion(day));
+  if (stage === 'clustering') return withRunLog('clustering', day, () => runClustering(day));
+  if (stage === 'menu') return withRunLog('menu', day, () => runMenu(day));
+  if (stage === 'recipes') return withRunLog('recipes', day, () => runRecipes(day));
   if (stage === 'full') {
-    await runIngestion(day);
-    await runClustering(day);
-    const fullOut = await runMenuAndRecipesAtomic(day);
-    return { ok: true, stage: 'full', day, ...fullOut };
+    return withRunLog('full', day, async () => {
+      await runIngestion(day);
+      await runClustering(day);
+      const fullOut = await runMenuAndRecipesAtomic(day);
+      return { ok: true, stage: 'full', day, ...fullOut };
+    });
   }
   throw new Error(`Unknown stage: ${stage}`);
 }
