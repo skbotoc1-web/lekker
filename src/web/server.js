@@ -26,16 +26,17 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
   ${jsonLd ? (Array.isArray(jsonLd) ? jsonLd.map(ld => `<script type="application/ld+json">${JSON.stringify(ld)}</script>`).join('') : `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`) : ''}
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="lekker Startseite">lekker</a>
-    <nav>
+    <nav aria-label="Hauptnavigation">
       <a href="/menue">Menü-Archiv</a>
       <a href="/wochenplan">Wochenplan</a>
       <a href="/status">Status</a>
       <a href="/api/menu/today">API</a>
     </nav>
   </header>
-  <main class="container">${body}</main>
+  <main id="main-content" class="container" tabindex="-1">${body}</main>
 </body>
 </html>`;
 }
@@ -60,7 +61,7 @@ function menuCards(menu, recipeLookup = new Set()) {
     <span>Rezepte: <strong>${recipeCount}/${EXPECTED_RECIPE_COUNT}</strong></span>
   </section>
   ${menu.status !== 'published' ? '<p class="draft-hint">Dieses Menü ist ein Entwurf. Einzelne Rezepte können noch fehlen.</p>' : ''}
-  ${!isComplete ? `<div class="prep-actions"><a class="ghost-btn" href="/menue">Archiv ansehen</a><a class="ghost-btn" href=".">Später erneut laden</a></div>` : ''}
+  ${!isComplete ? `<div class="prep-actions"><a class="ghost-btn" href="/menue">Archiv ansehen</a><a class="ghost-btn" href="/menue/${menu.day}">Später erneut laden</a></div>` : ''}
   <section class="grid" aria-label="Menüoptionen">
     <article class="card">
       <h2>🌱 Vegan</h2>
@@ -119,6 +120,32 @@ function renderInfoState({ title, message, backLinks = [] }) {
     : '';
 
   return `<article class='card'><h1>${title}</h1><p class='lead'>${message}</p>${links}</article>`;
+}
+
+function dayRotationIndex(seed, max) {
+  if (!max) return 0;
+  const base = Number(String(seed || '').replace(/-/g, '')) || 1;
+  return base % max;
+}
+
+function getTodayRecommendations(day) {
+  const rows = db.prepare('SELECT r.title, r.meta, r.option_type, r.meal_slot, m.day FROM recipes r JOIN menus m ON m.id = r.menu_id ORDER BY r.id DESC LIMIT 24').all();
+  if (!rows.length) return [];
+  const start = dayRotationIndex(day, rows.length);
+  const rotated = [...rows.slice(start), ...rows.slice(0, start)];
+  return rotated.slice(0, 3).map(r => {
+    const meta = JSON.parse(r.meta || '{}');
+    return {
+      title: meta.titleMarketing || r.title,
+      option: r.option_type,
+      slot: r.meal_slot,
+      day: r.day,
+      kcal: meta.kcal || '-',
+      proteinHint: meta.proteinHint || 'n/a',
+      co2Label: meta.co2Label || '-',
+      timeMin: meta.timeMin || '-'
+    };
+  });
 }
 
 export function createServer() {
@@ -334,7 +361,7 @@ export function createServer() {
       title: 'Systemstatus | lekker',
       description: 'Laufstatus der Pipeline und letzte Ausführungen.',
       canonical: '/status',
-      body: `<h1>Systemstatus</h1><section class='card'><table><thead><tr><th>Zeit</th><th>Stage</th><th>Status</th><th>Dauer</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Keine Runs vorhanden</td></tr>'}</tbody></table></section>
+      body: `<h1>Systemstatus</h1><section class='card'><div class='table-wrap'><table><thead><tr><th>Zeit</th><th>Stage</th><th>Status</th><th>Dauer</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Keine Runs vorhanden</td></tr>'}</tbody></table></div></section>
       <p><a href='/api/status'>JSON Status API</a></p>`
     }));
   });
@@ -345,12 +372,29 @@ export function createServer() {
       ['Was, wenn es schnell gehen muss?', 'Nutze die Cluster "schnell" und Rezepte unter 30 Minuten.'],
       ['Gibt es proteinreiche Optionen?', 'Ja, Rezeptseiten zeigen kcal, Protein-Hinweis und CO₂-Label.']
     ];
-    const ld = { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) };
+    const clusters = ['schnell', 'low-carb', 'vegetarisch', 'vegan', 'mit-fleisch', 'mit-fisch', 'familienfreundlich'];
+    const ld = [
+      { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        name: 'Was koche ich heute Schweiz Cluster',
+        itemListElement: clusters.map((slug, i) => ({ '@type': 'ListItem', position: i + 1, url: `/kategorie/${slug}` }))
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Start', item: '/' },
+          { '@type': 'ListItem', position: 2, name: 'Was koche ich heute Schweiz', item: '/was-koche-ich-heute-schweiz' }
+        ]
+      }
+    ];
     res.send(htmlLayout({
       title: 'Was koche ich heute Schweiz? | lekker',
       description: 'Schnelle Kochideen unter 30 Minuten für die Schweiz mit klaren Clustern.',
       canonical: '/was-koche-ich-heute-schweiz',
-      body: `<h1>Was koche ich heute in der Schweiz?</h1><p class='lead'>Schnelle Ideen unter 30 Minuten plus klare Cluster.</p><section class='card'><h2>Intent-Cluster</h2><div class='inline-links'><a href='/kategorie/schnell'>schnell</a><a href='/kategorie/low-carb'>low carb</a><a href='/kategorie/vegetarisch'>vegetarisch/vegan</a><a href='/kategorie/mit-fleisch'>mit Fleisch</a><a href='/kategorie/mit-fisch'>mit Fisch</a><a href='/kategorie/familienfreundlich'>familienfreundlich</a></div></section><section class='card'><h2>FAQ</h2>${faq.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</section><nav class='inline-links'><a href='/'>Tagemenü</a><a href='/rezepte'>Rezept-Index</a><a href='/menue'>Archiv</a></nav>`,
+      body: `<h1>Was koche ich heute in der Schweiz?</h1><p class='lead'>Schnelle Ideen unter 30 Minuten plus klare Cluster.</p><section class='card'><h2>Intent-Cluster</h2><div class='inline-links'><a href='/kategorie/schnell'>schnell</a><a href='/kategorie/low-carb'>low carb</a><a href='/kategorie/vegetarisch'>vegetarisch/vegan</a><a href='/kategorie/mit-fleisch'>mit Fleisch</a><a href='/kategorie/mit-fisch'>mit Fisch</a><a href='/kategorie/familienfreundlich'>familienfreundlich</a></div></section><section class='card'><h2>FAQ</h2>${faq.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p></details>`).join('')}</section><nav class='inline-links'><a href='/'>Tagesmenü</a><a href='/rezepte'>Rezept-Index</a><a href='/menue'>Archiv</a><a href='/wochenplan'>Wochenplan</a></nav>`,
       jsonLd: ld
     }));
   });
@@ -361,11 +405,40 @@ export function createServer() {
       const meta = JSON.parse(r.meta || '{}');
       return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}'>Zum Rezept</a></article>`;
     }).join('');
-    res.send(htmlLayout({ title: 'Rezept-Index | lekker', description: 'Rezeptkarten mit Zeit, Schwierigkeit, kcal, Protein und CO₂.', canonical: '/rezepte', body: `<h1>Rezept-Index</h1><section class='recipe-index-grid'>${cards || '<p>Keine Rezepte verfügbar</p>'}</section>` }));
+    const jsonLd = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'lekker Rezeptindex',
+      itemListElement: rows.map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `/rezept/${r.option_type}/${r.day}/${r.meal_slot}` }))
+    };
+    res.send(htmlLayout({ title: 'Rezept-Index | lekker', description: 'Rezeptkarten mit Zeit, Schwierigkeit, kcal, Protein und CO₂.', canonical: '/rezepte', body: `<h1>Rezept-Index</h1><nav class='inline-links'><a href='/'>Tag</a><a href='/menue'>Archiv</a><a href='/was-koche-ich-heute-schweiz'>Intent-Seite</a></nav><section class='recipe-index-grid'>${cards || '<p>Keine Rezepte verfügbar</p>'}</section>`, jsonLd }));
   });
 
   app.get('/kategorie/:slug', (req, res) => {
-    res.redirect(302, '/rezepte');
+    const { slug } = req.params;
+    const rows = db.prepare('SELECT r.option_type,r.meal_slot,r.title,r.meta,m.day FROM recipes r JOIN menus m ON m.id=r.menu_id ORDER BY m.day DESC LIMIT 60').all();
+    const filters = {
+      schnell: r => (JSON.parse(r.meta || '{}').timeMin || 999) <= 30,
+      'low-carb': r => /salat|bowl|gemüse|fisch|poulet/i.test(JSON.parse(r.meta || '{}').titleMarketing || r.title),
+      vegetarisch: r => r.option_type === 'vegan' || /käse|ei|vegetar/i.test(r.title),
+      vegan: r => r.option_type === 'vegan',
+      'mit-fleisch': r => /poulet|rind|fleisch/i.test(r.title),
+      'mit-fisch': r => /lachs|fisch|forelle|thunfisch/i.test(r.title),
+      familienfreundlich: r => /pasta|kartoffel|bowl|pfanne/i.test(r.title)
+    };
+    const filter = filters[slug] || (() => true);
+    const selected = rows.filter(filter).slice(0, 24);
+    const cards = selected.map(r => {
+      const meta = JSON.parse(r.meta || '{}');
+      return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}'>Zum Rezept</a></article>`;
+    }).join('');
+
+    res.send(htmlLayout({
+      title: `Kategorie ${slug} | lekker`,
+      description: `Rezeptauswahl für ${slug} auf lekker`,
+      canonical: `/kategorie/${slug}`,
+      body: `<h1>Kategorie: ${slug}</h1><nav class='inline-links'><a href='/was-koche-ich-heute-schweiz'>Intent-Hub</a><a href='/rezepte'>Rezeptindex</a><a href='/menue'>Archiv</a></nav><section class='recipe-index-grid'>${cards || '<p>Keine passenden Rezepte.</p>'}</section>`
+    }));
   });
 
   app.get('/wochenplan/print', (_, res) => {
@@ -373,6 +446,14 @@ export function createServer() {
     const lines = weekly.menus.map(m => `${m.day}: ${m.vegan_lunch} / ${m.omni_lunch}`).join('\n');
     const shopping = db.prepare('SELECT item, COUNT(*) as c FROM clustered_offers GROUP BY item ORDER BY c DESC LIMIT 20').all().map(x => `- ${x.item}`).join('\n');
     res.type('text/plain').send(`Lekker Wochenplan\n${lines}\n\nEinkaufsliste\n${shopping}`);
+  });
+
+  app.get('/wochenplan/export.csv', (_, res) => {
+    const weekly = getWeeklyPlan(7);
+    const shopping = db.prepare('SELECT item, COUNT(*) as c FROM clustered_offers GROUP BY item ORDER BY c DESC LIMIT 40').all();
+    const menuRows = weekly.menus.map(m => `${m.day};${m.vegan_lunch};${m.omni_lunch}`);
+    const shoppingRows = shopping.map(s => `item;${s.item};${s.c}`);
+    res.type('text/csv').send(['section;key;value', ...menuRows, ...shoppingRows].join('\n'));
   });
 
   app.get('/menue/:day', (req, res) => {
@@ -542,11 +623,24 @@ export function createServer() {
           ? '<p class="lead">Heute frisch kuratiert mit vollständigen Rezepten.</p>'
           : `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`;
 
+    const recommended = getTodayRecommendations(menu.day);
+    const recCards = recommended.map(r => `<article class='card recipe-index-card'><p class='eyebrow'>heute empfohlen · ${slotLabel(r.slot)}</p><h3>${r.title}</h3><p class='meta-inline'>${r.timeMin} Min · ${r.kcal} kcal · ${r.proteinHint} · CO₂ ${r.co2Label}</p><a class='recipe-link' href='/rezept/${r.option}/${r.day}/${r.slot}'>Zum Rezept</a></article>`).join('');
+    const faq = [
+      ['Was koche ich heute?', 'Nutze das Tagesmenü mit vollständigen Rezepten und direkter Einkaufsliste.'],
+      ['Was, wenn es schnell gehen muss?', 'Filtere in den Kategorien nach schnell und fokussiere auf Rezepte unter 30 Minuten.']
+    ];
+    const jsonLd = [
+      { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
+      { '@context': 'https://schema.org', '@type': 'ItemList', name: 'Heute empfohlen', itemListElement: recommended.map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `/rezept/${r.option}/${r.day}/${r.slot}` })) },
+      { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Start', item: '/' }] }
+    ];
+
     res.send(htmlLayout({
       title: isDraft ? `lekker – Entwurf ${menu.day}` : (mode === 'today-complete' ? `lekker – Tagesmenü ${menu.day}` : `lekker – Menü ${menu.day}`),
       description: 'Protein-fokussierte Menüvorschläge für den Schweizer Markt mit klaren Rezeptstatus.',
       canonical: '/',
-      body: `<h1>${heading}</h1>${intro}<p class='meta-inline'>Zuletzt aktualisiert: ${new Date().toISOString().slice(0, 10)}</p>${menuCards(menu, recipeLookup)}<p><a href='/wochenplan/print'>Wochenplan + Einkaufsliste drucken</a> · <a href='/menue'>Vergangene Menüs ansehen →</a></p>`
+      body: `<h1>${heading}</h1>${intro}<p class='meta-inline'>Zuletzt aktualisiert: ${new Date().toISOString().slice(0, 10)}</p>${menuCards(menu, recipeLookup)}<section class='card'><h2>Heute empfohlen</h2><div class='recipe-index-grid'>${recCards || '<p>Empfehlungen werden aufgebaut.</p>'}</div></section><p><a href='/wochenplan/print'>Wochenplan + Einkaufsliste drucken</a> · <a href='/was-koche-ich-heute-schweiz'>Intent-Hub</a> · <a href='/menue'>Vergangene Menüs ansehen →</a></p>`,
+      jsonLd
     }));
   });
 

@@ -1,6 +1,6 @@
 import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
-import { canonicalToken } from './ingredientNormalizer.js';
+import { canonicalToken, ingredientCategory } from './ingredientNormalizer.js';
 
 const VEGAN_LIBRARY = {
   fruehstueck: [
@@ -71,7 +71,7 @@ function norm(value) {
   return canonicalToken(fold(value).replace(/[^a-z]/g, ''));
 }
 
-function scoreDishByOffers(dish, offerIndex, slot) {
+function scoreDishByOffers(dish, offerIndex, categoryIndex, slot) {
   return dish.keywords.reduce((score, kw) => {
     const key = norm(kw);
     const direct = offerIndex.get(key) || 0;
@@ -83,28 +83,33 @@ function scoreDishByOffers(dish, offerIndex, slot) {
     const base = direct + fuzzy;
     const proteinBoost = PROTEIN_KEYS.has(key) ? 1.4 : 1;
     const slotBoost = slot === 'abendessen' && PROTEIN_KEYS.has(key) ? 1.2 : 1;
-    return score + (base * proteinBoost * slotBoost);
+    const taxonomy = ingredientCategory(kw.charAt(0).toUpperCase() + kw.slice(1));
+    const categoryBoost = (categoryIndex.get(taxonomy) || 0) > 0 ? 1.12 : 1;
+    return score + (base * proteinBoost * slotBoost * categoryBoost);
   }, 0);
 }
 
 function buildOfferIndex(day) {
   const todayOffers = db.prepare('SELECT item FROM clustered_offers WHERE day = ?').all(day);
   const idx = new Map();
+  const cat = new Map();
 
   for (const row of todayOffers) {
     const key = norm(row.item);
     if (!key) continue;
     idx.set(key, (idx.get(key) || 0) + 1);
+    const taxonomy = ingredientCategory(row.item);
+    cat.set(taxonomy, (cat.get(taxonomy) || 0) + 1);
   }
 
-  return idx;
+  return { idx, cat };
 }
 
-function pickCandidate(candidates, recentMenusJoined, offerIndex, slot) {
+function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slot) {
   const ranked = candidates
     .map(c => ({
       ...c,
-      offerScore: scoreDishByOffers(c, offerIndex, slot),
+      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slot),
       repeated: recentMenusJoined.includes(c.name.toLowerCase())
     }))
     .sort((a, b) => {
@@ -119,18 +124,18 @@ function pickCandidate(candidates, recentMenusJoined, offerIndex, slot) {
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
-  const offerIndex = buildOfferIndex(day);
+  const { idx: offerIndex, cat: categoryIndex } = buildOfferIndex(day);
 
-  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, 'fruehstueck');
-  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, 'mittagessen');
-  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, 'abendessen');
-  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, 'snack');
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, 'fruehstueck');
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, 'mittagessen');
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, 'abendessen');
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, 'snack');
   const veganDrink = VEGAN_LIBRARY.drink[0].name;
 
-  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, 'fruehstueck');
-  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, 'mittagessen');
-  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, 'abendessen');
-  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, 'snack');
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, 'fruehstueck');
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, 'mittagessen');
+  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, 'abendessen');
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, 'snack');
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];

@@ -57,7 +57,7 @@ test('api status returns contract fields', async () => {
   assert.equal(Array.isArray(json.latestRuns), true);
 });
 
-test('intent landing page and print export are available', async () => {
+test('intent landing page and exports are available', async () => {
   const a = await fetch(`${baseUrl}/was-koche-ich-heute-schweiz`);
   assert.equal(a.status, 200);
   const html = await a.text();
@@ -67,4 +67,12 @@ test('intent landing page and print export are available', async () => {
   assert.equal(b.status, 200);
   const txt = await b.text();
   assert.equal(txt.includes('Einkaufsliste'), true);
+
+  const c = await fetch(`${baseUrl}/wochenplan/export.csv`);
+  assert.equal(c.status, 200);
+  const csv = await c.text();
+  assert.equal(csv.includes('section;key;value'), true);
+
+  const d = await fetch(`${baseUrl}/kategorie/schnell`);
+  assert.equal(d.status, 200);
 });

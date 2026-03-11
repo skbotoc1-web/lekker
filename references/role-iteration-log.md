@@ -75,3 +75,19 @@ Integration Review:
 - Extraktionsqualität in allen 4 Retailer-Pfaden verbessert und dedup/fallback robuster gemacht.
 - Harmonisierung + Matching-Logik erhöht Alignment zwischen Angeboten und ausgewählten Gerichten.
 - Validierungstiefe erweitert, Test-Suite bleibt grün und leichtgewichtig.
+
+## Iteration 6
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | End-to-end Night-Prioritäten gebündelt: Retail-Qualität + SEO-Intent + Export-Nutzen in einem schlanken Loop | Scope-Verzettelung | Nur bestehende SSR/SQLite-Pfade erweitert, keine neue Infra |
+| CTO | Crawler-Heuristik pro Händler erweitert (mehr Selektorfamilien, tiefere JSON-LD-Rekursion, confidence-gesteuerte Auswahl, Hybrid-Fallback) | Scraper drift bei Website-Änderungen | Multi-Source-Extraktion + testbare fallback-Logik |
+| CFO | Lightweight-Guardrail eingehalten: 0 neue Runtime-Dependencies, nur modulare Funktionsupdates + Tests | Wartungskosten über Zeit | Kleine Utilities, geringe Kopplung, bestehende CI-Tests als Gate |
+| Designer | Intent-Hub und interne Linkhubs gestärkt; Kategorie-Seiten statt Redirect; rotierende „heute empfohlen“-Karten + sichtbare Freshness | Überladung der Startseite | kompakte Karten, bestehende Styles weiterverwendet |
+| Nutrition Lead | Harmonisierung auf Taxonomie-Level erweitert (protein/carbs/produce), stärkeres unit cleanup + robuste Synonymketten für matching | Fehlklassifizierung bei Freitext | Confidence + Canonical/Token-Normalisierung kombiniert |
+| AgentOps Lead | Testabdeckung erweitert: scraper fallback mix, JSON-LD extraction, taxonomy checks, category/export route validation | längere Testlaufzeit | kleine Fixtures, fokussierte Contract-Tests |
+
+Integration Review:
+- Retailer-Extraktion, Normalisierung und Menü-Matching greifen konsistenter ineinander.
+- SEO/UX-Elemente aus competitor analysis pragmatisch umgesetzt (Intent-Hub, Clusterseiten, strukturierte Daten, Linkhubs, Freshness, Exporte).
+- Plattform bleibt leichtgewichtig: SSR + SQLite + bestehender Teststack.

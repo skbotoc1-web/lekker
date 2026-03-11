@@ -30,3 +30,18 @@ test('menu planner matches harmonized synonym offers to recipe keywords', () => 
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_lunch, 'Rindstreifen mit Vollkornreis');
 });
+
+test('menu planner prioritizes fish dish when fish+veg offers dominate', () => {
+  const day = '2026-03-15';
+
+  db.prepare('DELETE FROM recipes').run();
+  db.prepare('DELETE FROM menus').run();
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'abendessen', 0, 'Lachs', 'lidl');
+  insert.run(day, 'abendessen', 0, 'Brokkoli', 'lidl');
+  insert.run(day, 'abendessen', 0, 'Kartoffeln', 'lidl');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_lunch, 'Lachs mit Kartoffeln und Gemüse');
+});

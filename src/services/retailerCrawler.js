@@ -12,6 +12,8 @@ const retailers = [
       '[class*="product"] [class*="title"]',
       '[class*="offer"] [class*="title"]',
       '[class*="m-product"] [title]',
+      '[class*="product"] [data-product-name]',
+      '[class*="tile"] [aria-label]',
       'article h2',
       'article h3',
       'a[title*="Bio"]',
@@ -27,6 +29,8 @@ const retailers = [
       '[class*="tile"] [class*="headline"]',
       '[class*="teaser"] [class*="title"]',
       '[data-qa*="product"] [title]',
+      '[data-qa*="product"] [aria-label]',
+      '[class*="offer"] [data-name]',
       'article h2',
       'article h3',
       'a[title]'
@@ -42,6 +46,8 @@ const retailers = [
       '[class*="product"] h3',
       '[class*="teaser"] [class*="title"]',
       '[class*="mod-offer"] [title]',
+      '[class*="mod-offer"] [aria-label]',
+      '[data-title]',
       'article h2',
       'article h3',
       'a[title]'
@@ -57,6 +63,8 @@ const retailers = [
       '[class*="offer"] h3',
       '[class*="tile"] [class*="title"]',
       '[class*="product-grid"] [title]',
+      '[class*="product-grid"] [aria-label]',
+      '[data-product-name]',
       'article h2',
       'article h3',
       'a[title]'
@@ -81,32 +89,36 @@ function tryParseJson(raw) {
   }
 }
 
+function extractJsonNames(node, out = []) {
+  if (!node) return out;
+
+  if (Array.isArray(node)) {
+    node.forEach(x => extractJsonNames(x, out));
+    return out;
+  }
+
+  if (typeof node !== 'object') return out;
+
+  if (typeof node.name === 'string') out.push(node.name);
+  if (typeof node.title === 'string') out.push(node.title);
+  if (typeof node.headline === 'string') out.push(node.headline);
+  if (typeof node.description === 'string' && node.description.length < 80) out.push(node.description);
+
+  for (const key of ['item', 'offers', 'itemListElement', 'mainEntity', 'about', 'hasPart']) {
+    if (node[key]) extractJsonNames(node[key], out);
+  }
+
+  return out;
+}
+
 function collectJsonLdNames($) {
   const names = [];
 
   $('script[type="application/ld+json"]').each((_, el) => {
     const raw = $(el).text();
     if (!raw) return;
-
     const parsed = tryParseJson(raw);
-    const arr = Array.isArray(parsed) ? parsed : [parsed];
-
-    for (const node of arr) {
-      if (!node) continue;
-      if (node?.name && typeof node.name === 'string') names.push(node.name);
-      if (node?.item?.name) names.push(String(node.item.name));
-      if (Array.isArray(node?.itemListElement)) {
-        for (const entry of node.itemListElement) {
-          const n = entry?.name || entry?.item?.name;
-          if (typeof n === 'string') names.push(n);
-        }
-      }
-      if (Array.isArray(node?.offers)) {
-        for (const offer of node.offers) {
-          if (offer?.name) names.push(String(offer.name));
-        }
-      }
-    }
+    extractJsonNames(parsed, names);
   });
 
   return names;
@@ -127,9 +139,9 @@ function collectSelectorTexts($, selectors) {
     });
   }
 
-  ['[data-product-name]', '[data-name]', '[data-title]'].forEach(sel => {
+  ['[data-product-name]', '[data-name]', '[data-title]', '[aria-label*="Bio"]'].forEach(sel => {
     $(sel).each((_, el) => {
-      const value = $(el).attr('data-product-name') || $(el).attr('data-name') || $(el).attr('data-title');
+      const value = $(el).attr('data-product-name') || $(el).attr('data-name') || $(el).attr('data-title') || $(el).attr('aria-label');
       if (value) out.push(value.trim());
     });
   });
@@ -153,7 +165,7 @@ function fallbackFor(retailerId) {
   for (const item of sequence) {
     if (seen.has(item)) continue;
     seen.add(item);
-    out.push({ item, price: 'n/a', mentions: 1, confidence: 0.5 });
+    out.push({ item, price: 'n/a', mentions: 1, confidence: 0.5, source: 'fallback' });
     if (out.length >= 10) break;
   }
   return out;
@@ -166,17 +178,18 @@ function finalizeSelection(harmonized, retailerId) {
   for (const row of harmonized) {
     const item = row.canonical;
     if (seen.has(item)) continue;
+    if (row.maxConfidence < 0.6 && row.mentions < 2) continue;
     seen.add(item);
-    selected.push({ item, price: 'n/a', mentions: row.mentions, confidence: row.maxConfidence });
+    selected.push({ item, price: 'n/a', mentions: row.mentions, confidence: row.maxConfidence, source: 'parsed' });
     if (selected.length >= 10) break;
   }
 
-  if (selected.length >= 2) {
-    const fill = fallbackFor(retailerId).filter(x => !seen.has(x.item)).slice(0, 10 - selected.length);
-    return [...selected, ...fill].slice(0, 10);
-  }
+  if (!selected.length) return fallbackFor(retailerId);
 
-  return fallbackFor(retailerId);
+  const fill = fallbackFor(retailerId)
+    .filter(x => !seen.has(x.item))
+    .slice(0, Math.max(0, 10 - selected.length));
+  return [...selected, ...fill].slice(0, 10);
 }
 
 export function parseRetailerHtml(html, retailerId) {
@@ -189,7 +202,7 @@ export function parseRetailerHtml(html, retailerId) {
     ...collectJsonLdNames($)
   ];
 
-  const harmonized = scoreRows(harmonizeIngredients(rawCandidates).slice(0, 40));
+  const harmonized = scoreRows(harmonizeIngredients(rawCandidates).slice(0, 80));
   return finalizeSelection(harmonized, retailerId);
 }
 
@@ -200,7 +213,7 @@ export async function crawlRetailer(retailerId) {
   try {
     const response = await fetch(retailer.url, {
       headers: {
-        'User-Agent': 'lekker-bot/1.4 (+swiss-retailer-harmonizer)',
+        'User-Agent': 'lekker-bot/1.5 (+swiss-retailer-harmonizer)',
         'Accept-Language': 'de-CH,de;q=0.9'
       }
     });

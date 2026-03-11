@@ -49,6 +49,7 @@ const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|mi
 const TOKEN_SYNONYMS = new Map([
   ['zucchetti', 'zucchini'],
   ['paprika', 'peperoni'],
+  ['pepperoni', 'peperoni'],
   ['moehren', 'karotten'],
   ['mohren', 'karotten'],
   ['ruebli', 'karotten'],
@@ -60,12 +61,23 @@ const TOKEN_SYNONYMS = new Map([
   ['huhn', 'pouletbrust'],
   ['haehnchen', 'pouletbrust'],
   ['hahnchen', 'pouletbrust'],
+  ['chicken', 'pouletbrust'],
   ['rinds', 'rindfleisch'],
+  ['lachsfilet', 'lachs'],
+  ['forellenfilet', 'forelle'],
+  ['thunfischfilet', 'thunfisch'],
   ['pasta', 'vollkornpasta'],
   ['nudeln', 'vollkornpasta'],
   ['susskartoffeln', 'suesskartoffeln'],
   ['chickpeas', 'kichererbsen']
 ]);
+
+export const INGREDIENT_TAXONOMY = {
+  proteins: ['Tofu', 'Kichererbsen', 'Linsen', 'Bohnen', 'Skyr', 'Eier', 'Pouletbrust', 'Lachs', 'Forelle', 'Thunfisch', 'Rindfleisch'],
+  carbs: ['Reis', 'Kartoffeln', 'Süsskartoffeln', 'Vollkornpasta', 'Haferflocken', 'Quinoa'],
+  produce: ['Brokkoli', 'Spinat', 'Zucchini', 'Peperoni', 'Karotten', 'Tomaten', 'Gurken', 'Äpfel', 'Birnen', 'Beeren', 'Bananen'],
+  dairyAndAlt: ['Naturjoghurt', 'Käse', 'Sojadrink', 'Haferdrink']
+};
 
 function fold(input) {
   return input
@@ -85,7 +97,8 @@ function removeUnits(input) {
   return input
     .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?)\b/g, ' ')
     .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
-    .replace(/\b(ca\.?|ab|nur|statt|pro|per)\b/g, ' ');
+    .replace(/\b(ca\.?|ab|nur|statt|pro|per)\b/g, ' ')
+    .replace(/\b(kaliber|klasse|gr\.|gross|klein|mittel)\b/g, ' ');
 }
 
 function cleanCandidate(original) {
@@ -104,6 +117,13 @@ function normalizeToken(token) {
 
 export function canonicalToken(value) {
   return normalizeToken(value);
+}
+
+export function ingredientCategory(canonical) {
+  for (const [group, values] of Object.entries(INGREDIENT_TAXONOMY)) {
+    if (values.includes(canonical)) return group;
+  }
+  return 'other';
 }
 
 export function normalizeIngredient(raw) {
@@ -129,6 +149,7 @@ export function normalizeIngredient(raw) {
         source: original,
         veganLikely: rule.veganLikely,
         categoryHint: rule.categoryHint,
+        taxonomy: ingredientCategory(rule.canonical),
         confidence: 0.96
       };
     }
@@ -144,6 +165,7 @@ export function normalizeIngredient(raw) {
     source: original,
     veganLikely: null,
     categoryHint: null,
+    taxonomy: 'other',
     confidence: 0.62
   };
 }
@@ -163,6 +185,7 @@ export function harmonizeIngredients(rawItems = []) {
         maxConfidence: n.confidence,
         veganLikely: n.veganLikely,
         categoryHint: n.categoryHint,
+        taxonomy: n.taxonomy,
         token: canonicalToken(n.canonical)
       });
       continue;

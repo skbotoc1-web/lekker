@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalToken, normalizeIngredient, harmonizeIngredients } from '../services/ingredientNormalizer.js';
+import { canonicalToken, normalizeIngredient, harmonizeIngredients, ingredientCategory } from '../services/ingredientNormalizer.js';
 
 test('normalizeIngredient maps common aliases to canonical forms', () => {
   const a = normalizeIngredient('Bio Kicher-Erbsen 500g');
@@ -42,4 +42,10 @@ test('canonical token harmonizes retailer synonyms for matching layer', () => {
   assert.equal(canonicalToken('Paprika'), 'peperoni');
   assert.equal(canonicalToken('Zucchetti'), 'zucchini');
   assert.equal(canonicalToken('Hähnchen'), 'pouletbrust');
+});
+
+test('ingredient taxonomy maps canonical values consistently', () => {
+  assert.equal(ingredientCategory('Lachs'), 'proteins');
+  assert.equal(ingredientCategory('Kartoffeln'), 'carbs');
+  assert.equal(ingredientCategory('Brokkoli'), 'produce');
 });

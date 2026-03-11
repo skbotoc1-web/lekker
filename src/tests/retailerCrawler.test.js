@@ -49,6 +49,14 @@ test('all retailer parsers produce deduplicated top 10 offers', () => {
   }
 });
 
+test('fallback strategy keeps parsed signals and fills remainder up to 10', () => {
+  const sparseHtml = '<article><h2>Bio Brokkoli 500g</h2></article>';
+  const out = parseRetailerHtml(sparseHtml, 'coop');
+  assert.equal(out.length, 10);
+  assert.equal(out[0].item, 'Brokkoli');
+  assert.equal(out.some(x => x.source === 'fallback'), true);
+});
+
 test('retailer-specific selector heuristics map to canonical ingredients', () => {
   const expectations = {
     migros: ['Brokkoli', 'Pouletbrust'],
@@ -63,4 +71,15 @@ test('retailer-specific selector heuristics map to canonical ingredients', () =>
       assert.ok(out.includes(expected), `${retailer} missing ${expected}`);
     }
   }
+});
+
+test('json-ld offers are considered as extraction fallback', () => {
+  const html = `
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"ItemList","itemListElement":[{"name":"Paprika Bio"},{"name":"Lachsfilet"}]}
+    </script>
+  `;
+  const out = parseRetailerHtml(html, 'lidl').map(x => x.item);
+  assert.equal(out.includes('Peperoni'), true);
+  assert.equal(out.includes('Lachs'), true);
 });
