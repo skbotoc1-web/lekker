@@ -1,6 +1,7 @@
 import express from 'express';
 import { db } from '../core/db.js';
 import { handleReview } from '../services/approvalService.js';
+import { runHook } from '../hooks/pipelineHooks.js';
 
 const TZ = 'Europe/Zurich';
 
@@ -70,8 +71,22 @@ function getDayToday() {
 export function createServer() {
   const app = express();
   app.use(express.static('public'));
+  app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_, res) => res.json({ ok: true }));
+
+  app.post('/hooks/run/:stage', async (req, res) => {
+    const expected = process.env.HOOK_TOKEN;
+    const provided = req.headers['x-hook-token'];
+    if (expected && provided !== expected) return res.status(401).json({ error: 'unauthorized' });
+
+    try {
+      const out = await runHook(req.params.stage);
+      return res.json(out);
+    } catch (err) {
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
 
   app.get('/robots.txt', (_, res) => {
     res.type('text/plain').send('User-agent: *\nAllow: /\nSitemap: /sitemap.xml\n');

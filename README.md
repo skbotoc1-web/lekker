@@ -73,6 +73,24 @@ git clone <repo-url> && cd lekker && ./scripts/deploy.sh
 - `GET /api/menu/today` – Tagesmenü + Rezepte
 - `GET /review/:token?action=approve|reject` – Freigabe/Zurückweisung
 - `GET /health`
+- `POST /hooks/run/:stage` – Hook Runner (`ingestion|clustering|menu|recipes|full`)
+
+### Hook-Automation (neu)
+
+`lekker` unterstützt jetzt Hook-basierte Stages mit token-gesicherter Ausführung:
+
+```bash
+curl -X POST http://localhost:8787/hooks/run/full \
+  -H "x-hook-token: $HOOK_TOKEN"
+```
+
+Oder lokal ohne HTTP:
+
+```bash
+npm run hook:full
+```
+
+Google-Sheets-Write läuft über Service Account (`GOOGLE_SHEET_ID` + `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` oder `GOOGLE_SERVICE_ACCOUNT_JSON`).
 
 ## Hinweise
 
