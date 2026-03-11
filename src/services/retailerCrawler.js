@@ -81,6 +81,8 @@ const fallbackItems = {
 
 const genericFallback = ['Tomaten', 'Kartoffeln', 'Gurken', 'Karotten', 'Reis', 'Quinoa', 'Kichererbsen', 'Linsen', 'Brokkoli', 'Bananen'];
 
+const HEADING_NOISE = /\b(angebote|aktionen|shop|prospekt|newsletter|kundenkonto|entdecken|inspiration)\b/i;
+
 function tryParseJson(raw) {
   try {
     return JSON.parse(raw);
@@ -149,11 +151,22 @@ function collectSelectorTexts($, selectors) {
   return out;
 }
 
+function sourceWeight(sources = []) {
+  let weight = 0;
+  for (const source of sources) {
+    const lowered = String(source || '').toLowerCase();
+    if (lowered.includes('json')) weight += 0.2;
+    else if (lowered.includes('data-')) weight += 0.15;
+    else if (lowered.includes('selector')) weight += 0.1;
+  }
+  return weight;
+}
+
 function scoreRows(rows) {
   return rows
     .map(row => ({
       ...row,
-      score: row.mentions * 2 + row.maxConfidence + (row.mentions > 1 ? 0.6 : 0) + (row.sources.length > 1 ? 0.3 : 0)
+      score: row.mentions * 2 + row.maxConfidence + (row.mentions > 1 ? 0.6 : 0) + (row.sources.length > 1 ? 0.3 : 0) + sourceWeight(row.sources)
     }))
     .sort((a, b) => b.score - a.score);
 }
@@ -192,17 +205,32 @@ function finalizeSelection(harmonized, retailerId) {
   return [...selected, ...fill].slice(0, 10);
 }
 
+function dedupeRawCandidates(items = []) {
+  const seen = new Set();
+  const out = [];
+
+  for (const item of items) {
+    const normalized = String(item || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    if (!normalized || normalized.length < 3 || HEADING_NOISE.test(normalized)) continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(item);
+  }
+
+  return out;
+}
+
 export function parseRetailerHtml(html, retailerId) {
   const retailer = retailers.find(r => r.id === retailerId);
   if (!retailer) throw new Error(`Unknown retailer ${retailerId}`);
 
   const $ = cheerio.load(html || '');
-  const rawCandidates = [
+  const rawCandidates = dedupeRawCandidates([
     ...collectSelectorTexts($, retailer.selectors),
     ...collectJsonLdNames($)
-  ];
+  ]);
 
-  const harmonized = scoreRows(harmonizeIngredients(rawCandidates).slice(0, 80));
+  const harmonized = scoreRows(harmonizeIngredients(rawCandidates).slice(0, 120));
   return finalizeSelection(harmonized, retailerId);
 }
 

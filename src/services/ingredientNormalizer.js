@@ -69,7 +69,15 @@ const TOKEN_SYNONYMS = new Map([
   ['pasta', 'vollkornpasta'],
   ['nudeln', 'vollkornpasta'],
   ['susskartoffeln', 'suesskartoffeln'],
-  ['chickpeas', 'kichererbsen']
+  ['chickpeas', 'kichererbsen'],
+  ['nature', 'natur'],
+  ['natur', 'natur'],
+  ['frisch', 'frisch'],
+  ['bio', 'bio'],
+  ['filet', 'filet'],
+  ['brustfilet', 'pouletbrust'],
+  ['rinderhack', 'rindfleisch'],
+  ['thunfischsteak', 'thunfisch']
 ]);
 
 export const INGREDIENT_TAXONOMY = {
@@ -103,9 +111,10 @@ function removeUnits(input) {
 
 function cleanCandidate(original) {
   return original
+    .split(/[\/,+]/)[0]
     .replace(/[|•·:;]+/g, ' ')
     .replace(/\([^)]*\)/g, ' ')
-    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini)\b/gi, '')
+    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini|Natur|Nature)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
 }

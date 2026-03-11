@@ -91,3 +91,19 @@ Integration Review:
 - Retailer-Extraktion, Normalisierung und Menü-Matching greifen konsistenter ineinander.
 - SEO/UX-Elemente aus competitor analysis pragmatisch umgesetzt (Intent-Hub, Clusterseiten, strukturierte Daten, Linkhubs, Freshness, Exporte).
 - Plattform bleibt leichtgewichtig: SSR + SQLite + bestehender Teststack.
+
+## Iteration 7
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Night-Ziel auf vier Händlerdaten + bessere Rezeptpassung + SEO-Conversionpfad fokussiert | zu viele Teilziele in einem Sprint | genau ein integrierter Loop, keine Nebenfeatures |
+| CTO | Extraktion robuster gemacht (Heading-Noise-Filter, stärkere Raw-Dedupe, größere Harmonize-Window), Slot+Vegan-Signale ins Matching eingebaut | Heuristiken können überfiltern | konservative Filter + Fallback-Füllung bleibt aktiv |
+| CFO | Lightweight-Guardrail gehalten: 0 neue Dependencies, nur Funktions-/Test-Updates | schleichende Komplexität im Matching | kleine pure helpers + klare Testfälle pro Risiko |
+| Designer | Bestehende Intent/Cluster/Index/Print-Flows bestätigt; Fokus auf Relevanz statt zusätzlicher UI-Schichten | geringerer visuell sichtbarer Fortschritt | Qualität vor Oberflächen-Ausbau |
+| Nutrition Lead | Harmonisierung erweitert (Delimiter-/Label-Cleanup, Synonymhärte), Mapping für gemischte Retail-Bezeichnungen verbessert | Grenzfälle bei exotischen Produktnamen | bekannte Canonicals priorisieren, Soft-Fallback behalten |
+| AgentOps Lead | Neue Validierungstests für Noise-Filter, Mapping-Härte und slot+vegan Matching eingeführt | Testlaufzeit steigt | kleine Fixtures, zielgerichtete Assertions |
+
+Integration Review:
+- Retailer-Scrapes für Migros/Coop/Aldi/Lidl sind resilienter gegen Dubletten und Header-Rauschen.
+- Ingredient-Harmonisierung und Menü-Matching sind stärker auf echte Angebotslage ausgerichtet.
+- SEO/UX-Erweiterungen bleiben aktiv, Plattform weiterhin schlank (SSR/SQLite, keine neuen Laufzeitpakete).

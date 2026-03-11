@@ -83,3 +83,18 @@ test('json-ld offers are considered as extraction fallback', () => {
   assert.equal(out.includes('Peperoni'), true);
   assert.equal(out.includes('Lachs'), true);
 });
+
+test('retailer parser removes heading noise and still keeps strong ingredient hits', () => {
+  const html = `
+    <h2>Angebote dieser Woche</h2>
+    <h2>Angebote dieser Woche</h2>
+    <article><h3>Bio Brokkoli 500g</h3></article>
+    <article><h3>Bio Brokkoli 500g</h3></article>
+    <article><h3>Rinds Hack 2 x 500g</h3></article>
+  `;
+  const out = parseRetailerHtml(html, 'coop');
+  const items = out.map(x => x.item);
+  assert.equal(items.includes('Brokkoli'), true);
+  assert.equal(items.includes('Rindfleisch'), true);
+  assert.equal(items.includes('Angebote dieser Woche'), false);
+});

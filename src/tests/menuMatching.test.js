@@ -45,3 +45,16 @@ test('menu planner prioritizes fish dish when fish+veg offers dominate', () => {
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_lunch, 'Lachs mit Kartoffeln und Gemüse');
 });
+
+test('menu planner uses slot+vegan signals to choose offer-aligned vegan lunch', () => {
+  const day = '2026-03-16';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'mittagessen', 1, 'Kichererbsen', 'migros');
+  insert.run(day, 'mittagessen', 1, 'Reis', 'migros');
+  insert.run(day, 'mittagessen', 1, 'Spinat', 'coop');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.vegan_lunch, 'Kichererbsen-Curry mit Naturreis');
+});

@@ -49,3 +49,13 @@ test('ingredient taxonomy maps canonical values consistently', () => {
   assert.equal(ingredientCategory('Kartoffeln'), 'carbs');
   assert.equal(ingredientCategory('Brokkoli'), 'produce');
 });
+
+test('normalizer handles mixed retailer labels and delimiter-heavy text', () => {
+  const a = normalizeIngredient('Skyr Nature, Aktion');
+  const b = normalizeIngredient('Paprika/Bio Mix');
+  const c = normalizeIngredient('Rinds Hack 2 x 500g');
+
+  assert.equal(a?.canonical, 'Skyr');
+  assert.equal(b?.canonical, 'Peperoni');
+  assert.equal(c?.canonical, 'Rindfleisch');
+});
