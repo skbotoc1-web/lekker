@@ -43,6 +43,7 @@ Leichtgewichtige WebApp für den Schweizer Markt: tägliche Menüvorschläge (ve
 
 - [x] Datenmodell + Migrationen
 - [x] Retailer-Crawler + Fallback-Strategie
+- [x] Zutaten-Normalisierung/Synonym-Harmonisierung über alle Händler
 - [x] Clustering + Kategoriezuordnung
 - [x] Menügenerator (Protein, Vegan/Omni, CO2, Anti-Wiederholung)
 - [x] Rezeptgenerator

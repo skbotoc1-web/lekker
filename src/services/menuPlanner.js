@@ -2,41 +2,99 @@ import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
 
 const VEGAN_LIBRARY = {
-  fruehstueck: ['Protein-Porridge mit Beeren', 'Tofu-Rührei mit Vollkorntoast', 'Soja-Joghurt-Bowl mit Nüssen'],
-  mittagessen: ['Linsen-Bowl mit Quinoa und Ofengemüse', 'Kichererbsen-Curry mit Naturreis', 'Tofu-Stir-Fry mit Broccoli'],
-  abendessen: ['Bohnen-Chili mit Mais und Avocado', 'Vollkornpasta mit Linsen-Bolognese', 'Süsskartoffel-Tofu-Blech'],
-  snack: ['Nussmix mit Apfel', 'Hummus mit Gemüsesticks', 'Protein-Smoothie'],
-  drink: ['Infused Water Zitrone-Minze', 'Ungesüsster Eistee', 'Wasser mit Beeren']
+  fruehstueck: [
+    { name: 'Protein-Porridge mit Beeren', keywords: ['haferflocken', 'beeren', 'bananen'] },
+    { name: 'Tofu-Rührei mit Vollkorntoast', keywords: ['tofu', 'tomaten', 'brot'] },
+    { name: 'Soja-Joghurt-Bowl mit Nüssen', keywords: ['sojadrink', 'nüsse', 'äpfel'] }
+  ],
+  mittagessen: [
+    { name: 'Linsen-Bowl mit Quinoa und Ofengemüse', keywords: ['linsen', 'quinoa', 'brokkoli', 'peperoni'] },
+    { name: 'Kichererbsen-Curry mit Naturreis', keywords: ['kichererbsen', 'reis', 'spinat'] },
+    { name: 'Tofu-Stir-Fry mit Broccoli', keywords: ['tofu', 'brokkoli', 'zucchini'] }
+  ],
+  abendessen: [
+    { name: 'Bohnen-Chili mit Mais und Avocado', keywords: ['bohnen', 'tomaten', 'peperoni'] },
+    { name: 'Vollkornpasta mit Linsen-Bolognese', keywords: ['vollkornpasta', 'linsen', 'tomaten'] },
+    { name: 'Süsskartoffel-Tofu-Blech', keywords: ['süsskartoffeln', 'tofu', 'brokkoli'] }
+  ],
+  snack: [
+    { name: 'Nussmix mit Apfel', keywords: ['nüsse', 'äpfel', 'birnen'] },
+    { name: 'Hummus mit Gemüsesticks', keywords: ['kichererbsen', 'karotten', 'gurken'] },
+    { name: 'Protein-Smoothie', keywords: ['bananen', 'beeren', 'haferdrink'] }
+  ],
+  drink: [
+    { name: 'Infused Water Zitrone-Minze', keywords: [] },
+    { name: 'Ungesüsster Eistee', keywords: [] },
+    { name: 'Wasser mit Beeren', keywords: ['beeren'] }
+  ]
 };
 
 const OMNI_LIBRARY = {
-  fruehstueck: ['Skyr-Bowl mit Hafer und Früchten', 'Eiermuffins mit Spinat', 'Hüttenkäse-Brot mit Tomaten'],
-  mittagessen: ['Poulet-Quinoa-Salat', 'Lachs mit Kartoffeln und Gemüse', 'Rindstreifen mit Vollkornreis'],
-  abendessen: ['Forelle mit Ofengemüse', 'Pouletpfanne mit Bohnen', 'Protein-Pasta mit Thunfisch'],
-  snack: ['Skyr mit Nüssen', 'Kefir-Shake', 'Käsewürfel und Birne'],
-  drink: ['Wasser mit Limette', 'Hausgemachter Eistee', 'Mineralwasser']
+  fruehstueck: [
+    { name: 'Skyr-Bowl mit Hafer und Früchten', keywords: ['skyr', 'haferflocken', 'beeren'] },
+    { name: 'Eiermuffins mit Spinat', keywords: ['eier', 'spinat'] },
+    { name: 'Hüttenkäse-Brot mit Tomaten', keywords: ['käse', 'tomaten', 'brot'] }
+  ],
+  mittagessen: [
+    { name: 'Poulet-Quinoa-Salat', keywords: ['pouletbrust', 'quinoa', 'gurken', 'tomaten'] },
+    { name: 'Lachs mit Kartoffeln und Gemüse', keywords: ['lachs', 'kartoffeln', 'brokkoli'] },
+    { name: 'Rindstreifen mit Vollkornreis', keywords: ['rindfleisch', 'reis', 'peperoni'] }
+  ],
+  abendessen: [
+    { name: 'Forelle mit Ofengemüse', keywords: ['forelle', 'zucchini', 'kartoffeln'] },
+    { name: 'Pouletpfanne mit Bohnen', keywords: ['pouletbrust', 'bohnen', 'tomaten'] },
+    { name: 'Protein-Pasta mit Thunfisch', keywords: ['vollkornpasta', 'thunfisch', 'tomaten'] }
+  ],
+  snack: [
+    { name: 'Skyr mit Nüssen', keywords: ['skyr', 'nüsse'] },
+    { name: 'Kefir-Shake', keywords: ['kefir', 'bananen'] },
+    { name: 'Käsewürfel und Birne', keywords: ['käse', 'birnen'] }
+  ],
+  drink: [
+    { name: 'Wasser mit Limette', keywords: [] },
+    { name: 'Hausgemachter Eistee', keywords: [] },
+    { name: 'Mineralwasser', keywords: [] }
+  ]
 };
 
-function pickWithoutRecent(candidates, recentMenusJoined) {
-  const found = candidates.find(c => !recentMenusJoined.includes(c.toLowerCase()));
-  return found || candidates[0];
+function scoreDishByOffers(dish, offersText) {
+  return dish.keywords.reduce((score, kw) => (offersText.includes(kw) ? score + 1 : score), 0);
+}
+
+function pickCandidate(candidates, recentMenusJoined, offersText) {
+  const ranked = candidates
+    .map(c => ({
+      ...c,
+      offerScore: scoreDishByOffers(c, offersText),
+      repeated: recentMenusJoined.includes(c.name.toLowerCase())
+    }))
+    .sort((a, b) => {
+      if (a.repeated !== b.repeated) return a.repeated ? 1 : -1;
+      if (a.offerScore !== b.offerScore) return b.offerScore - a.offerScore;
+      return 0;
+    });
+
+  return ranked[0].name;
 }
 
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
 
-  const veganBreakfast = pickWithoutRecent(VEGAN_LIBRARY.fruehstueck, recentText);
-  const veganLunch = pickWithoutRecent(VEGAN_LIBRARY.mittagessen, recentText);
-  const veganDinner = pickWithoutRecent(VEGAN_LIBRARY.abendessen, recentText);
-  const veganSnack = pickWithoutRecent(VEGAN_LIBRARY.snack, recentText);
-  const veganDrink = VEGAN_LIBRARY.drink[0];
+  const todayOffers = db.prepare('SELECT item FROM clustered_offers WHERE day = ?').all(day);
+  const offersText = todayOffers.map(x => String(x.item || '').toLowerCase()).join(' | ');
 
-  const omniBreakfast = pickWithoutRecent(OMNI_LIBRARY.fruehstueck, recentText);
-  const omniLunch = pickWithoutRecent(OMNI_LIBRARY.mittagessen, recentText);
-  const omniDinner = pickWithoutRecent(OMNI_LIBRARY.abendessen, recentText);
-  const omniSnack = pickWithoutRecent(OMNI_LIBRARY.snack, recentText);
-  const omniDrink = OMNI_LIBRARY.drink[0];
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offersText);
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offersText);
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offersText);
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offersText);
+  const veganDrink = VEGAN_LIBRARY.drink[0].name;
+
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offersText);
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offersText);
+  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offersText);
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offersText);
+  const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];
   const co2Score = Number((dishes.reduce((s, d) => s + estimateDishCo2(d), 0) / dishes.length).toFixed(2));
