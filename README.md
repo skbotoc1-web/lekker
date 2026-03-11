@@ -74,6 +74,9 @@ git clone <repo-url> && cd lekker && ./scripts/deploy.sh
 - `GET /review/:token?action=approve|reject` – Freigabe/Zurückweisung
 - `GET /health`
 - `POST /hooks/run/:stage` – Hook Runner (`ingestion|clustering|menu|recipes|full`)
+- `GET /feeds/:tab.csv` – Exportfeed (CSV)
+- `GET /feeds/:tab.jsonl` – Exportfeed (JSONL)
+- `GET /feeds/menu-today.json` – Tagesmenü als JSON-Feed
 
 ### Hook-Automation (neu)
 
@@ -90,7 +93,8 @@ Oder lokal ohne HTTP:
 npm run hook:full
 ```
 
-Google-Sheets-Write läuft über Service Account (`GOOGLE_SHEET_ID` + `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` oder `GOOGLE_SERVICE_ACCOUNT_JSON`).
+Datensenke ist standardmässig **lokal** (`DATA_SINK=local`) und schreibt Feeds nach `data/feeds/*.csv|*.jsonl`.
+Optional kann auf Google Sheets umgestellt werden (`DATA_SINK=google`) mit Service Account.
 
 ## Hinweise
 

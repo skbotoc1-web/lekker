@@ -37,8 +37,8 @@ async function runIngestion(day) {
     }
   }
 
-  await appendRows('offers_raw', rows);
-  return { ok: true, stage: 'ingestion', day, count: rows.length };
+  const sink = await appendRows('offers_raw', rows);
+  return { ok: true, stage: 'ingestion', day, count: rows.length, sink };
 }
 
 async function runClustering(day) {
@@ -48,13 +48,13 @@ async function runClustering(day) {
   const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
 
   for (const r of clustered) insert.run(day, r.category, r.vegan, r.item, r.retailer);
-  await appendRows('offers_clustered', clustered.map(r => [day, r.category, r.vegan, r.item, r.retailer]));
-  return { ok: true, stage: 'clustering', day, count: clustered.length };
+  const sink = await appendRows('offers_clustered', clustered.map(r => [day, r.category, r.vegan, r.item, r.retailer]));
+  return { ok: true, stage: 'clustering', day, count: clustered.length, sink };
 }
 
 async function runMenu(day) {
   const menu = createDailyMenu(day);
-  await appendRows('menus', [[
+  const sink = await appendRows('menus', [[
     day,
     menu.vegan_breakfast,
     menu.vegan_lunch,
@@ -69,13 +69,13 @@ async function runMenu(day) {
     menu.co2_score,
     menu.status
   ]]);
-  return { ok: true, stage: 'menu', day, menuId: menu.id };
+  return { ok: true, stage: 'menu', day, menuId: menu.id, sink };
 }
 
 async function runRecipes(day) {
   const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
   if (!menu) throw new Error('No menu found for day');
   const recipes = generateRecipesForMenu(menu);
-  await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps]));
-  return { ok: true, stage: 'recipes', day, count: recipes.length };
+  const sink = await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps]));
+  return { ok: true, stage: 'recipes', day, count: recipes.length, sink };
 }

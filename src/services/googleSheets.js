@@ -1,10 +1,31 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const FEEDS_DIR = path.resolve('data/feeds');
 
 function base64url(input) {
   return Buffer.from(input).toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function ensureFeedsDir() {
+  fs.mkdirSync(FEEDS_DIR, { recursive: true });
+}
+
+function appendLocal(tab, rows) {
+  ensureFeedsDir();
+
+  const jsonlPath = path.join(FEEDS_DIR, `${tab}.jsonl`);
+  const csvPath = path.join(FEEDS_DIR, `${tab}.csv`);
+
+  const jsonl = rows.map(r => JSON.stringify({ ts: new Date().toISOString(), tab, row: r })).join('\n') + '\n';
+  fs.appendFileSync(jsonlPath, jsonl, 'utf8');
+
+  const csvLines = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n') + '\n';
+  fs.appendFileSync(csvPath, csvLines, 'utf8');
+
+  return { sink: 'local', tab, inserted: rows.length, jsonlPath, csvPath };
 }
 
 function loadServiceAccount() {
@@ -51,10 +72,9 @@ async function getAccessToken() {
   return json.access_token;
 }
 
-export async function appendRows(tab, rows) {
+async function appendGoogle(tab, rows) {
   const sheetId = process.env.GOOGLE_SHEET_ID;
   if (!sheetId) throw new Error('Missing GOOGLE_SHEET_ID');
-  if (!rows.length) return;
 
   const accessToken = await getAccessToken();
   const range = `${tab}!A1`;
@@ -70,5 +90,27 @@ export async function appendRows(tab, rows) {
   });
 
   if (!res.ok) throw new Error(`Sheets append ${tab} failed ${res.status}: ${await res.text()}`);
-  return res.json();
+  const out = await res.json();
+  return { sink: 'google', tab, inserted: rows.length, out };
+}
+
+export async function appendRows(tab, rows) {
+  if (!rows.length) return { sink: 'none', tab, inserted: 0 };
+
+  const sinkMode = (process.env.DATA_SINK || 'local').toLowerCase();
+  const allowFallback = (process.env.SINK_FALLBACK_TO_LOCAL || 'true') === 'true';
+
+  if (sinkMode === 'local') return appendLocal(tab, rows);
+
+  if (sinkMode === 'google') {
+    try {
+      return await appendGoogle(tab, rows);
+    } catch (error) {
+      if (!allowFallback) throw error;
+      const fallback = appendLocal(tab, rows);
+      return { ...fallback, warning: `google_failed_fallback_local: ${error.message}` };
+    }
+  }
+
+  return appendLocal(tab, rows);
 }

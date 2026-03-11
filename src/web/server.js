@@ -1,9 +1,12 @@
 import express from 'express';
+import fs from 'node:fs';
+import path from 'node:path';
 import { db } from '../core/db.js';
 import { handleReview } from '../services/approvalService.js';
 import { runHook } from '../hooks/pipelineHooks.js';
 
 const TZ = 'Europe/Zurich';
+const FEEDS_DIR = path.resolve('data/feeds');
 
 function htmlLayout({ title, description, canonical, body, jsonLd }) {
   return `<!doctype html>
@@ -86,6 +89,28 @@ export function createServer() {
     } catch (err) {
       return res.status(500).json({ ok: false, error: err.message });
     }
+  });
+
+  app.get('/feeds/:tab.:ext', (req, res) => {
+    const { tab, ext } = req.params;
+
+    if (tab === 'menu-today' && ext === 'json') {
+      const day = getDayToday();
+      const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
+      if (!menu) return res.status(404).json({ error: 'Noch kein Menü für heute verfügbar.' });
+      const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(menu.id)
+        .map(r => ({ ...r, ingredients: JSON.parse(r.ingredients), steps: JSON.parse(r.steps) }));
+      return res.json({ menu, recipes });
+    }
+
+    const allowedExt = ['csv', 'jsonl'];
+    if (!allowedExt.includes(ext)) return res.status(400).send('Unsupported feed extension.');
+
+    const filePath = path.join(FEEDS_DIR, `${tab}.${ext}`);
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Feed not found.' });
+
+    res.type(ext === 'csv' ? 'text/csv' : 'application/x-ndjson');
+    return res.send(fs.readFileSync(filePath, 'utf8'));
   });
 
   app.get('/robots.txt', (_, res) => {
