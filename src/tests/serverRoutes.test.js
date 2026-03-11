@@ -44,3 +44,15 @@ test('api menu today returns 409 for incomplete selected menu', async () => {
   const json = await res.json();
   assert.equal(typeof json.error, 'string');
 });
+
+test('intent landing page and print export are available', async () => {
+  const a = await fetch(`${baseUrl}/was-koche-ich-heute-schweiz`);
+  assert.equal(a.status, 200);
+  const html = await a.text();
+  assert.equal(html.includes('Intent-Cluster'), true);
+
+  const b = await fetch(`${baseUrl}/wochenplan/print`);
+  assert.equal(b.status, 200);
+  const txt = await b.text();
+  assert.equal(txt.includes('Einkaufsliste'), true);
+});

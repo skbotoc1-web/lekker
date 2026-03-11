@@ -27,3 +27,13 @@ test('harmonizeIngredients deduplicates by canonical key', () => {
   assert.ok(chickpeas);
   assert.ok(chickpeas.mentions >= 3);
 });
+
+test('normalizeIngredient handles unit cleanup + taxonomy harmonization', () => {
+  const a = normalizeIngredient('2 x 500g Pouletbrustfilet');
+  const b = normalizeIngredient('zucchetti frisch');
+  const c = normalizeIngredient('Paprika Bio Aktion');
+
+  assert.equal(a?.canonical, 'Pouletbrust');
+  assert.equal(b?.canonical, 'Zucchini');
+  assert.equal(c?.canonical, 'Peperoni');
+});

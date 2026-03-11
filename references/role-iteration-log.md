@@ -44,3 +44,18 @@ Integration Review:
 Integration Review:
 - End-to-end deutlich robuster: Integrität + Sichtbarkeit + Troubleshooting
 - Hook-Orchestrierung und lokaler Feed-Fallback vollständig erhalten
+
+## Iteration 4
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | SEO- und Intent-Hub priorisiert (`/was-koche-ich-heute-schweiz`) mit klaren Nutzerclustern | Zu viel Content ohne Mehrwert | Fokus auf direkte Decision-UX + interne Linkhubs |
+| CTO | Retailer-Crawler-Heuristiken (Migros/Coop/Aldi/Lidl), stärkere Dedup/Fallback-Strategie, neue Routen (`/rezepte`, `/kategorie/:slug`, `/wochenplan/print`) | Selektor-Drift bei Händlerseiten | robuste Multi-Selector + JSON-LD-Fallback + konservative Fallback-Liste |
+| CFO | Lightweight-Ansatz bestätigt: kein neues Frontend-Framework, SSR + bestehendes CSS | Feature-Kosten wachsen schleichend | nur serverseitige Erweiterungen, keine neue Runtime-Abhängigkeit |
+| Designer | Grössere Rezeptkarten mit Zeit/Schwierigkeit/kcal/Protein/CO₂; FAQ-Block und Freshness-Signale | UI-Überladung | kompakte Karten + bestehende Design-Tokens |
+| Nutrition Lead | Ingredient-Normalisierung vertieft (Synonyme, Unit-Cleanup, harmonisierte Canonicals), Matching auf Angebotsnähe optimiert | falsche Kanonisierung bei Grenzfällen | Confidence-gestützt + Soft-Food-Heuristik |
+| AgentOps Lead | Validierungstests erweitert (alle 4 Retailer, Mapping-Harmonisierung, Landing/Print-Routen) | test maintenance overhead | kleine, zielgerichtete Tests statt großer Fixtures |
+
+Integration Review:
+- Zielbild umgesetzt: bessere Angebotsqualität, bessere Rezept-Ausrichtung, stärkere SEO/UX-Basis.
+- Druckbare Wochenplanung + Einkaufsliste als pragmatischer Utility-Mehrwert integriert.
