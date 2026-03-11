@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "NODE_ENV=development node src/index.js",
-    "test": "node --test src/tests/*.test.js",
+    "test": "rm -f ./data/lekker.test.db && DB_PATH=./data/lekker.test.db node --test src/tests/*.test.js",
     "seed": "node scripts/seed-guidelines.js",
     "hook:full": "node scripts/run-hook.js full"
   },

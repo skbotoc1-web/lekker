@@ -6,6 +6,7 @@ import { generateRecipesForMenu } from '../services/recipeService.js';
 import { appendRows } from '../services/googleSheets.js';
 
 const TZ = 'Europe/Zurich';
+const EXPECTED_RECIPE_COUNT = 10;
 const dayStamp = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
 
 export async function runHook(stage) {
@@ -17,9 +18,8 @@ export async function runHook(stage) {
   if (stage === 'full') {
     await runIngestion(day);
     await runClustering(day);
-    await runMenu(day);
-    await runRecipes(day);
-    return { ok: true, stage: 'full', day };
+    const fullOut = await runMenuAndRecipesAtomic(day);
+    return { ok: true, stage: 'full', day, ...fullOut };
   }
   throw new Error(`Unknown stage: ${stage}`);
 }
@@ -78,4 +78,53 @@ async function runRecipes(day) {
   const recipes = generateRecipesForMenu(menu);
   const sink = await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps, r.meta]));
   return { ok: true, stage: 'recipes', day, count: recipes.length, sink };
+}
+
+export function createMenuAndRecipesAtomic(day) {
+  const tx = db.transaction(() => {
+    const menu = createDailyMenu(day);
+    const recipes = generateRecipesForMenu(menu);
+    if (recipes.length !== EXPECTED_RECIPE_COUNT) {
+      throw new Error(`Recipe integrity check failed: expected ${EXPECTED_RECIPE_COUNT}, got ${recipes.length}`);
+    }
+    return {
+      menu,
+      recipes,
+      coverage: {
+        expected: EXPECTED_RECIPE_COUNT,
+        actual: recipes.length
+      }
+    };
+  });
+
+  return tx();
+}
+
+async function runMenuAndRecipesAtomic(day) {
+  const { menu, recipes } = createMenuAndRecipesAtomic(day);
+
+  const [menuSink, recipeSink] = await Promise.all([
+    appendRows('menus', [[
+      day,
+      menu.vegan_breakfast,
+      menu.vegan_lunch,
+      menu.vegan_dinner,
+      menu.vegan_snack,
+      menu.vegan_drink,
+      menu.omni_breakfast,
+      menu.omni_lunch,
+      menu.omni_dinner,
+      menu.omni_snack,
+      menu.omni_drink,
+      menu.co2_score,
+      menu.status
+    ]]),
+    appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps, r.meta]))
+  ]);
+
+  return {
+    menuId: menu.id,
+    recipes: recipes.length,
+    sink: { menus: menuSink, recipes: recipeSink }
+  };
 }

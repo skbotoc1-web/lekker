@@ -8,6 +8,7 @@ import { generateRecipesForMenu } from '../services/recipeService.js';
 import { sendApprovalMail } from '../services/approvalService.js';
 
 const tz = 'Europe/Zurich';
+const EXPECTED_RECIPE_COUNT = 10;
 
 function dayStamp() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: tz });
@@ -31,11 +32,23 @@ function agent5_clusterAndStructure() {
   log.info('offers_clustered', { day, count: clustered.length });
 }
 
-function agent6_buildMenu() {
+function agent6_buildMenuAndRecipesAtomic() {
   const day = dayStamp();
-  const menu = createDailyMenu(day);
-  log.info('menu_generated', { day, menuId: menu.id, co2: menu.co2_score });
-  return menu;
+
+  const tx = db.transaction(() => {
+    const menu = createDailyMenu(day);
+    const recipes = generateRecipesForMenu(menu);
+
+    if (recipes.length !== EXPECTED_RECIPE_COUNT) {
+      throw new Error(`Recipe integrity check failed: expected ${EXPECTED_RECIPE_COUNT}, got ${recipes.length}`);
+    }
+
+    return { menu, recipes };
+  });
+
+  const out = tx();
+  log.info('menu_and_recipes_generated_atomic', { day, menuId: out.menu.id, recipes: out.recipes.length, co2: out.menu.co2_score });
+  return out.menu;
 }
 
 function agent7_buildRecipes(menu) {
@@ -63,8 +76,7 @@ export function runFullPipelineOnce() {
     const retailers = getRetailers();
     for (const r of retailers) await agent1to4(r.id);
     agent5_clusterAndStructure();
-    const menu = agent6_buildMenu();
-    agent7_buildRecipes(menu);
+    const menu = agent6_buildMenuAndRecipesAtomic();
     await agent8_sendReview(menu);
     agent9_publishIfApproved();
   })();
@@ -80,14 +92,20 @@ export function scheduleAgents() {
   // 06:30 aggregate
   cron.schedule('30 6 * * *', () => agent5_clusterAndStructure(), { timezone: tz });
 
-  // 06:35 menu draft
-  cron.schedule('35 6 * * *', () => agent6_buildMenu(), { timezone: tz });
+  // 06:35 atomic draft creation incl. recipes
+  cron.schedule('35 6 * * *', () => agent6_buildMenuAndRecipesAtomic(), { timezone: tz });
 
-  // 06:40 recipes
+  // 06:40 fallback repair if recipes are missing unexpectedly
   cron.schedule('40 6 * * *', () => {
     const day = dayStamp();
     const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
-    if (menu) agent7_buildRecipes(menu);
+    if (!menu) return;
+
+    const count = db.prepare('SELECT COUNT(*) as n FROM recipes WHERE menu_id=?').get(menu.id)?.n || 0;
+    if (count < EXPECTED_RECIPE_COUNT) {
+      log.warn('recipe_repair_triggered', { day, menuId: menu.id, count, expected: EXPECTED_RECIPE_COUNT });
+      agent7_buildRecipes(menu);
+    }
   }, { timezone: tz });
 
   // 06:45 send review mail
