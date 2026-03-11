@@ -35,9 +35,9 @@ const KNOWN_INGREDIENTS = [
   { re: /\bhaferdrink\b/i, canonical: 'Haferdrink', veganLikely: true, categoryHint: 'fruehstueck' },
   { re: /\b(poulet(?:brust|filet|brustfilet)?|huhn|haehnchen|hahnchen)\b/i, canonical: 'Pouletbrust', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\brind(?!en)|rinds|rindfleisch|rindshack\b/i, canonical: 'Rindfleisch', veganLikely: false, categoryHint: 'abendessen' },
-  { re: /\blachs\b/i, canonical: 'Lachs', veganLikely: false, categoryHint: 'abendessen' },
-  { re: /\bforelle\b/i, canonical: 'Forelle', veganLikely: false, categoryHint: 'abendessen' },
-  { re: /\bthunfisch\b/i, canonical: 'Thunfisch', veganLikely: false, categoryHint: 'abendessen' },
+  { re: /\blachs(?:filet)?\b/i, canonical: 'Lachs', veganLikely: false, categoryHint: 'abendessen' },
+  { re: /\bforelle(?:nfilet|filet)?\b/i, canonical: 'Forelle', veganLikely: false, categoryHint: 'abendessen' },
+  { re: /\bthunfisch(?:filet)?\b/i, canonical: 'Thunfisch', veganLikely: false, categoryHint: 'abendessen' },
   { re: /\beier?|ei\b/i, canonical: 'Eier', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bskyr\b/i, canonical: 'Skyr', veganLikely: false, categoryHint: 'fruehstueck' },
   { re: /\bjoghurt\b/i, canonical: 'Naturjoghurt', veganLikely: false, categoryHint: 'fruehstueck' },
@@ -45,6 +45,27 @@ const KNOWN_INGREDIENTS = [
 ];
 
 const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|milch|drink|fisch|fleisch|protein|bio|frisch|filet)\b/i;
+
+const TOKEN_SYNONYMS = new Map([
+  ['zucchetti', 'zucchini'],
+  ['paprika', 'peperoni'],
+  ['moehren', 'karotten'],
+  ['mohren', 'karotten'],
+  ['ruebli', 'karotten'],
+  ['apfel', 'aepfel'],
+  ['birne', 'birnen'],
+  ['mandeln', 'nuesse'],
+  ['walnuesse', 'nuesse'],
+  ['walnusse', 'nuesse'],
+  ['huhn', 'pouletbrust'],
+  ['haehnchen', 'pouletbrust'],
+  ['hahnchen', 'pouletbrust'],
+  ['rinds', 'rindfleisch'],
+  ['pasta', 'vollkornpasta'],
+  ['nudeln', 'vollkornpasta'],
+  ['susskartoffeln', 'suesskartoffeln'],
+  ['chickpeas', 'kichererbsen']
+]);
 
 function fold(input) {
   return input
@@ -63,7 +84,8 @@ function sanitizeRaw(input) {
 function removeUnits(input) {
   return input
     .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?)\b/g, ' ')
-    .replace(/\b(ca\.?|ab|nur|statt)\b/g, ' ');
+    .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
+    .replace(/\b(ca\.?|ab|nur|statt|pro|per)\b/g, ' ');
 }
 
 function cleanCandidate(original) {
@@ -73,6 +95,15 @@ function cleanCandidate(original) {
     .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini)\b/gi, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeToken(token) {
+  const t = fold(token).replace(/[^a-z]/g, '');
+  return TOKEN_SYNONYMS.get(t) || t;
+}
+
+export function canonicalToken(value) {
+  return normalizeToken(value);
 }
 
 export function normalizeIngredient(raw) {
@@ -131,7 +162,8 @@ export function harmonizeIngredients(rawItems = []) {
         mentions: 1,
         maxConfidence: n.confidence,
         veganLikely: n.veganLikely,
-        categoryHint: n.categoryHint
+        categoryHint: n.categoryHint,
+        token: canonicalToken(n.canonical)
       });
       continue;
     }

@@ -17,3 +17,16 @@ test('menu planner prefers dishes that match clustered offers', () => {
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_lunch, 'Lachs mit Kartoffeln und Gemüse');
 });
+
+test('menu planner matches harmonized synonym offers to recipe keywords', () => {
+  const day = '2026-03-14';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'mittagessen', 0, 'Paprika', 'aldi');
+  insert.run(day, 'mittagessen', 0, 'Rinds', 'coop');
+  insert.run(day, 'mittagessen', 0, 'Reis', 'coop');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_lunch, 'Rindstreifen mit Vollkornreis');
+});

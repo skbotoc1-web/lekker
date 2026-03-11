@@ -59,3 +59,19 @@ Integration Review:
 Integration Review:
 - Zielbild umgesetzt: bessere Angebotsqualität, bessere Rezept-Ausrichtung, stärkere SEO/UX-Basis.
 - Druckbare Wochenplanung + Einkaufsliste als pragmatischer Utility-Mehrwert integriert.
+
+## Iteration 5
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Overnight-Fokus auf Datenqualität + Matching-Trefferquote für Retail-Angebote finalisiert | Scope-Ausweitung in UX/SEO | Nur bestehende SSR-Flächen genutzt, kein zusätzlicher Runtime-Stack |
+| CTO | Retailer-Heuristiken vertieft (Migros/Coop/Aldi/Lidl), JSON-LD/Attribute-Extraktion erweitert, smarter Fallback-Mix statt harter Vollfallback | Selector-Drift in Zukunft | Mehrere Selektorfamilien + konservative fallback chain |
+| CFO | Lightweight-Prinzip gehalten: keine neuen Dependencies, nur bestehende Services/Test-Suite erweitert | steigende Wartungslast durch Heuristiken | Kleine, klar abgegrenzte Funktionen + tests als Schutzschild |
+| Designer | Bereits vorhandene Intent-/Index-/Print-UX bestätigt; keine neuen UI-Komplexitätskosten eingeführt | UX-Stagnation | Fokus auf inhaltliche Relevanz statt zusätzlichem Frontend-Code |
+| Nutrition Lead | Ingredient-Harmonisierung ausgebaut (Synonyme/Token-Harmonisierung/Unit-Cleanup) inkl. robusteren Fisch/Fleisch-/Gemüse-Mappings | Fehlklassifikation bei exotischen Begriffen | confidence-basiert + bekannte Canonicals priorisiert |
+| AgentOps Lead | Neue Validierungstests für retailer-spezifische Selektoren + Synonym-Matching in Menüplanung ergänzt | mehr Testlaufzeit | test-concurrency bleibt 1, kleine Fixtures, schnelle lokale Ausführung |
+
+Integration Review:
+- Extraktionsqualität in allen 4 Retailer-Pfaden verbessert und dedup/fallback robuster gemacht.
+- Harmonisierung + Matching-Logik erhöht Alignment zwischen Angeboten und ausgewählten Gerichten.
+- Validierungstiefe erweitert, Test-Suite bleibt grün und leichtgewichtig.

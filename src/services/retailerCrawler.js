@@ -10,6 +10,8 @@ const retailers = [
       '[data-testid*="product"] h3',
       '[data-testid*="offer"] h2',
       '[class*="product"] [class*="title"]',
+      '[class*="offer"] [class*="title"]',
+      '[class*="m-product"] [title]',
       'article h2',
       'article h3',
       'a[title*="Bio"]',
@@ -23,6 +25,7 @@ const retailers = [
       '[class*="product"] h2',
       '[class*="product"] h3',
       '[class*="tile"] [class*="headline"]',
+      '[class*="teaser"] [class*="title"]',
       '[data-qa*="product"] [title]',
       'article h2',
       'article h3',
@@ -38,6 +41,7 @@ const retailers = [
       '[class*="product"] h2',
       '[class*="product"] h3',
       '[class*="teaser"] [class*="title"]',
+      '[class*="mod-offer"] [title]',
       'article h2',
       'article h3',
       'a[title]'
@@ -52,6 +56,7 @@ const retailers = [
       '[class*="offer"] h2',
       '[class*="offer"] h3',
       '[class*="tile"] [class*="title"]',
+      '[class*="product-grid"] [title]',
       'article h2',
       'article h3',
       'a[title]'
@@ -60,11 +65,21 @@ const retailers = [
 ];
 
 const fallbackItems = {
-  migros: ['Brokkoli', 'Haferflocken', 'Tofu', 'Kichererbsen', 'Äpfel', 'Karotten', 'Vollkornbrot', 'Naturjoghurt', 'Lachs', 'Pouletbrust'],
+  migros: ['Brokkoli', 'Haferflocken', 'Tofu', 'Kichererbsen', 'Äpfel', 'Karotten', 'Vollkornpasta', 'Naturjoghurt', 'Lachs', 'Pouletbrust'],
   coop: ['Spinat', 'Bananen', 'Linsen', 'Nüsse', 'Quinoa', 'Tomaten', 'Eier', 'Skyr', 'Rindfleisch', 'Reis'],
   aldi: ['Peperoni', 'Zucchini', 'Kartoffeln', 'Bohnen', 'Sojadrink', 'Beeren', 'Vollkornpasta', 'Käse', 'Thunfisch', 'Pouletbrust'],
   lidl: ['Brokkoli', 'Pilze', 'Süsskartoffeln', 'Haferdrink', 'Mandeln', 'Birnen', 'Skyr', 'Feta', 'Forelle', 'Rindfleisch']
 };
+
+const genericFallback = ['Tomaten', 'Kartoffeln', 'Gurken', 'Karotten', 'Reis', 'Quinoa', 'Kichererbsen', 'Linsen', 'Brokkoli', 'Bananen'];
+
+function tryParseJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 function collectJsonLdNames($) {
   const names = [];
@@ -73,21 +88,24 @@ function collectJsonLdNames($) {
     const raw = $(el).text();
     if (!raw) return;
 
-    try {
-      const parsed = JSON.parse(raw);
-      const arr = Array.isArray(parsed) ? parsed : [parsed];
-      for (const node of arr) {
-        if (node?.name && typeof node.name === 'string') names.push(node.name);
-        if (node?.item?.name) names.push(String(node.item.name));
-        if (Array.isArray(node?.itemListElement)) {
-          for (const entry of node.itemListElement) {
-            const n = entry?.name || entry?.item?.name;
-            if (typeof n === 'string') names.push(n);
-          }
+    const parsed = tryParseJson(raw);
+    const arr = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const node of arr) {
+      if (!node) continue;
+      if (node?.name && typeof node.name === 'string') names.push(node.name);
+      if (node?.item?.name) names.push(String(node.item.name));
+      if (Array.isArray(node?.itemListElement)) {
+        for (const entry of node.itemListElement) {
+          const n = entry?.name || entry?.item?.name;
+          if (typeof n === 'string') names.push(n);
         }
       }
-    } catch {
-      // ignore malformed json-ld
+      if (Array.isArray(node?.offers)) {
+        for (const offer of node.offers) {
+          if (offer?.name) names.push(String(offer.name));
+        }
+      }
     }
   });
 
@@ -104,10 +122,18 @@ function collectSelectorTexts($, selectors) {
       if (title) out.push(title.trim());
       const aria = $(el).attr('aria-label');
       if (aria) out.push(aria.trim());
-      const dataName = $(el).attr('data-product-name');
+      const dataName = $(el).attr('data-product-name') || $(el).attr('data-name') || $(el).attr('data-title');
       if (dataName) out.push(dataName.trim());
     });
   }
+
+  ['[data-product-name]', '[data-name]', '[data-title]'].forEach(sel => {
+    $(sel).each((_, el) => {
+      const value = $(el).attr('data-product-name') || $(el).attr('data-name') || $(el).attr('data-title');
+      if (value) out.push(value.trim());
+    });
+  });
+
   return out;
 }
 
@@ -115,13 +141,42 @@ function scoreRows(rows) {
   return rows
     .map(row => ({
       ...row,
-      score: row.mentions * 2 + row.confidence + (row.mentions > 1 ? 0.6 : 0)
+      score: row.mentions * 2 + row.maxConfidence + (row.mentions > 1 ? 0.6 : 0) + (row.sources.length > 1 ? 0.3 : 0)
     }))
     .sort((a, b) => b.score - a.score);
 }
 
 function fallbackFor(retailerId) {
-  return fallbackItems[retailerId].map(item => ({ item, price: 'n/a', mentions: 1, confidence: 0.5 }));
+  const seen = new Set();
+  const sequence = [...(fallbackItems[retailerId] || []), ...genericFallback];
+  const out = [];
+  for (const item of sequence) {
+    if (seen.has(item)) continue;
+    seen.add(item);
+    out.push({ item, price: 'n/a', mentions: 1, confidence: 0.5 });
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+function finalizeSelection(harmonized, retailerId) {
+  const selected = [];
+  const seen = new Set();
+
+  for (const row of harmonized) {
+    const item = row.canonical;
+    if (seen.has(item)) continue;
+    seen.add(item);
+    selected.push({ item, price: 'n/a', mentions: row.mentions, confidence: row.maxConfidence });
+    if (selected.length >= 10) break;
+  }
+
+  if (selected.length >= 2) {
+    const fill = fallbackFor(retailerId).filter(x => !seen.has(x.item)).slice(0, 10 - selected.length);
+    return [...selected, ...fill].slice(0, 10);
+  }
+
+  return fallbackFor(retailerId);
 }
 
 export function parseRetailerHtml(html, retailerId) {
@@ -134,28 +189,8 @@ export function parseRetailerHtml(html, retailerId) {
     ...collectJsonLdNames($)
   ];
 
-  const harmonized = scoreRows(harmonizeIngredients(rawCandidates)
-    .slice(0, 30)
-    .map(x => ({ item: x.canonical, price: 'n/a', mentions: x.mentions, confidence: x.maxConfidence }))
-  );
-
-  const selected = [];
-  const seen = new Set();
-  for (const row of harmonized) {
-    if (seen.has(row.item)) continue;
-    seen.add(row.item);
-    selected.push(row);
-    if (selected.length >= 10) break;
-  }
-
-  if (selected.length >= 8) return selected.slice(0, 10);
-
-  const fill = fallbackItems[retailerId]
-    .filter(item => !seen.has(item))
-    .slice(0, 10 - selected.length)
-    .map(item => ({ item, price: 'n/a', mentions: 1, confidence: 0.5 }));
-
-  return [...selected, ...fill].slice(0, 10);
+  const harmonized = scoreRows(harmonizeIngredients(rawCandidates).slice(0, 40));
+  return finalizeSelection(harmonized, retailerId);
 }
 
 export async function crawlRetailer(retailerId) {
@@ -165,7 +200,7 @@ export async function crawlRetailer(retailerId) {
   try {
     const response = await fetch(retailer.url, {
       headers: {
-        'User-Agent': 'lekker-bot/1.3 (+swiss-retailer-harmonizer)',
+        'User-Agent': 'lekker-bot/1.4 (+swiss-retailer-harmonizer)',
         'Accept-Language': 'de-CH,de;q=0.9'
       }
     });
@@ -174,8 +209,7 @@ export async function crawlRetailer(retailerId) {
 
     const html = await response.text();
     const parsed = parseRetailerHtml(html, retailerId);
-    if (parsed.length < 8) return fallbackFor(retailerId);
-    return parsed;
+    return parsed.length ? parsed : fallbackFor(retailerId);
   } catch {
     return fallbackFor(retailerId);
   }

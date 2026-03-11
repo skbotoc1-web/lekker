@@ -1,5 +1,6 @@
 import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
+import { canonicalToken } from './ingredientNormalizer.js';
 
 const VEGAN_LIBRARY = {
   fruehstueck: [
@@ -59,22 +60,43 @@ const OMNI_LIBRARY = {
 
 const PROTEIN_KEYS = new Set(['tofu', 'kichererbsen', 'linsen', 'bohnen', 'skyr', 'eier', 'pouletbrust', 'lachs', 'forelle', 'thunfisch', 'rindfleisch']);
 
+function fold(input) {
+  return String(input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function norm(value) {
+  return canonicalToken(fold(value).replace(/[^a-z]/g, ''));
+}
+
 function scoreDishByOffers(dish, offerIndex, slot) {
   return dish.keywords.reduce((score, kw) => {
-    const base = offerIndex.get(kw) || 0;
-    const proteinBoost = PROTEIN_KEYS.has(kw) ? 1.4 : 1;
-    const slotBoost = slot === 'abendessen' && PROTEIN_KEYS.has(kw) ? 1.2 : 1;
+    const key = norm(kw);
+    const direct = offerIndex.get(key) || 0;
+    let fuzzy = 0;
+    for (const [offerKey, count] of offerIndex.entries()) {
+      if (offerKey.includes(key) || key.includes(offerKey)) fuzzy = Math.max(fuzzy, count * 0.55);
+    }
+
+    const base = direct + fuzzy;
+    const proteinBoost = PROTEIN_KEYS.has(key) ? 1.4 : 1;
+    const slotBoost = slot === 'abendessen' && PROTEIN_KEYS.has(key) ? 1.2 : 1;
     return score + (base * proteinBoost * slotBoost);
   }, 0);
 }
 
 function buildOfferIndex(day) {
-  const todayOffers = db.prepare('SELECT item, category, vegan FROM clustered_offers WHERE day = ?').all(day);
-  const joined = todayOffers.map(x => String(x.item || '').toLowerCase());
+  const todayOffers = db.prepare('SELECT item FROM clustered_offers WHERE day = ?').all(day);
   const idx = new Map();
-  for (const item of joined) {
-    idx.set(item, (idx.get(item) || 0) + 1);
+
+  for (const row of todayOffers) {
+    const key = norm(row.item);
+    if (!key) continue;
+    idx.set(key, (idx.get(key) || 0) + 1);
   }
+
   return idx;
 }
 
