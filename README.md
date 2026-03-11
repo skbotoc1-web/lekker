@@ -16,8 +16,15 @@ Leichtgewichtige WebApp für den Schweizer Markt: tägliche Menüvorschläge (ve
 **Scheduling:** node-cron (Europe/Zurich)  
 **Ingestion:** Retailer-Crawler (Cheerio + Fallbacks)  
 **Semantik/Clustering:** Lightweight Hash-Embeddings + Heuristik (modular austauschbar)  
-**Workflow:** 9 Agenten als deterministische Pipeline  
+**Workflow:** 10 Rollen/Agenten als deterministische Pipeline  
 **Frontend:** SSR HTML (sehr leicht deploybar)  
+
+### Rollenmodell (inkl. Design)
+
+- **CEO/Orchestrator:** priorisiert Outcomes, steuert Gesamtpipeline
+- **CTO:** technische Architektur, Integrations- und Qualitätsentscheidungen
+- **CFO:** ROI/Margen-Guardrail (>=35% für Softwarebetrieb)
+- **Designer (neu):** Marken-Konsistenz, UI/UX-Qualität, Responsive Verhalten (Desktop + Mobile), visuelle Wiedererkennbarkeit über alle Seiten und States
 
 ### Agenten-Pipeline
 
@@ -30,6 +37,7 @@ Leichtgewichtige WebApp für den Schweizer Markt: tägliche Menüvorschläge (ve
 7. 06:40 Agent 7 generiert Schritt-für-Schritt-Rezepte
 8. 06:45 Agent 8 sendet Freigabe-Mail (Approve/Reject Link)
 9. Alle 5 Min Agent 9 prüft Freigabe und publiziert
+10. Designer-Rolle prüft UI-Qualität (Design-Tokens, Konsistenz, Responsive, Accessibility) vor Release-Freigabe
 
 ## Maßnahmenplan (Schritt 2)
 
