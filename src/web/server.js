@@ -4,9 +4,12 @@ import path from 'node:path';
 import { db } from '../core/db.js';
 import { handleReview } from '../services/approvalService.js';
 import { runHook } from '../hooks/pipelineHooks.js';
+import { getWeeklyPlan } from '../services/weeklyPlan.js';
 
 const TZ = 'Europe/Zurich';
 const FEEDS_DIR = path.resolve('data/feeds');
+const RECIPE_SLOTS = ['fruehstueck', 'mittagessen', 'abendessen', 'snack', 'drink'];
+const EXPECTED_RECIPE_COUNT = RECIPE_SLOTS.length * 2;
 
 function htmlLayout({ title, description, canonical, body, jsonLd }) {
   return `<!doctype html>
@@ -25,9 +28,11 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">lekker</a>
+    <a class="brand" href="/" aria-label="lekker Startseite">lekker</a>
     <nav>
       <a href="/menue">Menü-Archiv</a>
+      <a href="/wochenplan">Wochenplan</a>
+      <a href="/status">Status</a>
       <a href="/api/menu/today">API</a>
     </nav>
   </header>
@@ -36,32 +41,54 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
 </html>`;
 }
 
-function menuCards(menu) {
+function recipeKey(option, slot) {
+  return `${option}:${slot}`;
+}
+
+function getRecipeLookup(menuId) {
+  const rows = db.prepare('SELECT option_type, meal_slot FROM recipes WHERE menu_id=?').all(menuId);
+  return new Set(rows.map(r => recipeKey(r.option_type, r.meal_slot)));
+}
+
+function recipeCta(day, lookup, option, slot) {
+  if (!lookup.has(recipeKey(option, slot))) {
+    return `<span class="recipe-pending" aria-label="Rezept folgt">Rezept folgt</span>`;
+  }
+  return `<a class="recipe-link" href="/rezept/${option}/${day}/${slot}">Rezept</a>`;
+}
+
+function menuCards(menu, recipeLookup = new Set()) {
+  const recipeCount = recipeLookup.size;
+  const isComplete = recipeCount >= EXPECTED_RECIPE_COUNT;
+
   return `
   <section class="status-row">
     <span class="badge ${menu.status === 'published' ? 'ok' : 'warn'}">${menu.status}</span>
+    <span class="badge ${isComplete ? 'ok' : 'warn'}">${isComplete ? 'Rezepte komplett' : 'Rezepte in Vorbereitung'}</span>
     <span>Datum: <strong>${menu.day}</strong></span>
     <span>CO₂ Ø: <strong>${menu.co2_score}</strong></span>
+    <span>Rezepte: <strong>${recipeCount}/${EXPECTED_RECIPE_COUNT}</strong></span>
   </section>
-  <section class="grid">
+  ${menu.status !== 'published' ? '<p class="draft-hint">Dieses Menü ist ein Entwurf. Einzelne Rezepte können noch fehlen.</p>' : ''}
+  <section class="grid" aria-label="Menüoptionen">
     <article class="card">
       <h2>🌱 Vegan</h2>
-      <ul>
-        <li><strong>Frühstück:</strong> ${menu.vegan_breakfast} <a href="/rezept/vegan/${menu.day}/fruehstueck">Rezept</a></li>
-        <li><strong>Mittag:</strong> ${menu.vegan_lunch} <a href="/rezept/vegan/${menu.day}/mittagessen">Rezept</a></li>
-        <li><strong>Abend:</strong> ${menu.vegan_dinner} <a href="/rezept/vegan/${menu.day}/abendessen">Rezept</a></li>
-        <li><strong>Snack:</strong> ${menu.vegan_snack} <a href="/rezept/vegan/${menu.day}/snack">Rezept</a></li>
-        <li><strong>Getränk:</strong> ${menu.vegan_drink} <a href="/rezept/vegan/${menu.day}/drink">Rezept</a></li>
+      <ul class='meal-list'>
+        <li><span><strong>Frühstück</strong><small>${menu.vegan_breakfast}</small></span>${recipeCta(menu.day, recipeLookup, 'vegan', 'fruehstueck')}</li>
+        <li><span><strong>Mittag</strong><small>${menu.vegan_lunch}</small></span>${recipeCta(menu.day, recipeLookup, 'vegan', 'mittagessen')}</li>
+        <li><span><strong>Abend</strong><small>${menu.vegan_dinner}</small></span>${recipeCta(menu.day, recipeLookup, 'vegan', 'abendessen')}</li>
+        <li><span><strong>Snack</strong><small>${menu.vegan_snack}</small></span>${recipeCta(menu.day, recipeLookup, 'vegan', 'snack')}</li>
+        <li><span><strong>Getränk</strong><small>${menu.vegan_drink}</small></span>${recipeCta(menu.day, recipeLookup, 'vegan', 'drink')}</li>
       </ul>
     </article>
     <article class="card">
       <h2>🍽️ Nicht-vegan</h2>
-      <ul>
-        <li><strong>Frühstück:</strong> ${menu.omni_breakfast} <a href="/rezept/omni/${menu.day}/fruehstueck">Rezept</a></li>
-        <li><strong>Mittag:</strong> ${menu.omni_lunch} <a href="/rezept/omni/${menu.day}/mittagessen">Rezept</a></li>
-        <li><strong>Abend:</strong> ${menu.omni_dinner} <a href="/rezept/omni/${menu.day}/abendessen">Rezept</a></li>
-        <li><strong>Snack:</strong> ${menu.omni_snack} <a href="/rezept/omni/${menu.day}/snack">Rezept</a></li>
-        <li><strong>Getränk:</strong> ${menu.omni_drink} <a href="/rezept/omni/${menu.day}/drink">Rezept</a></li>
+      <ul class='meal-list'>
+        <li><span><strong>Frühstück</strong><small>${menu.omni_breakfast}</small></span>${recipeCta(menu.day, recipeLookup, 'omni', 'fruehstueck')}</li>
+        <li><span><strong>Mittag</strong><small>${menu.omni_lunch}</small></span>${recipeCta(menu.day, recipeLookup, 'omni', 'mittagessen')}</li>
+        <li><span><strong>Abend</strong><small>${menu.omni_dinner}</small></span>${recipeCta(menu.day, recipeLookup, 'omni', 'abendessen')}</li>
+        <li><span><strong>Snack</strong><small>${menu.omni_snack}</small></span>${recipeCta(menu.day, recipeLookup, 'omni', 'snack')}</li>
+        <li><span><strong>Getränk</strong><small>${menu.omni_drink}</small></span>${recipeCta(menu.day, recipeLookup, 'omni', 'drink')}</li>
       </ul>
     </article>
   </section>`;
@@ -86,9 +113,38 @@ function slotLabel(slot) {
     mittagessen: 'Mittag',
     abendessen: 'Abend',
     snack: 'Snack / Zvieri',
-    drink: 'Drink of the day'
+    drink: 'Drink des Tages'
   };
   return map[slot] || slot;
+}
+
+function difficultyLabel(value) {
+  if (value <= 1) return 'sehr einfach';
+  if (value <= 2) return 'einfach';
+  if (value <= 3) return 'mittel';
+  if (value <= 4) return 'anspruchsvoll';
+  return 'fortgeschritten';
+}
+
+function pickHomepageMenu() {
+  const today = getDayToday();
+  const rows = db.prepare(`
+    SELECT m.*, (
+      SELECT COUNT(*) FROM recipes r WHERE r.menu_id = m.id
+    ) AS recipe_count
+    FROM menus m
+    WHERE m.day <= ?
+    ORDER BY m.day DESC
+  `).all(today);
+
+  if (!rows.length) return null;
+  const todayComplete = rows.find(r => r.day === today && r.recipe_count >= EXPECTED_RECIPE_COUNT);
+  if (todayComplete) return { menu: todayComplete, mode: 'today-complete' };
+
+  const latestComplete = rows.find(r => r.recipe_count >= EXPECTED_RECIPE_COUNT);
+  if (latestComplete) return { menu: latestComplete, mode: 'latest-complete' };
+
+  return { menu: rows[0], mode: 'latest-incomplete' };
 }
 
 export function createServer() {
@@ -140,7 +196,7 @@ export function createServer() {
   app.get('/sitemap.xml', (_, res) => {
     const rows = db.prepare('SELECT day FROM menus ORDER BY day DESC LIMIT 200').all();
     const urls = rows.map(r => `<url><loc>/menue/${r.day}</loc></url>`).join('');
-    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>/</loc></url><url><loc>/menue</loc></url>${urls}</urlset>`);
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>/</loc></url><url><loc>/menue</loc></url><url><loc>/wochenplan</loc></url><url><loc>/status</loc></url>${urls}</urlset>`);
   });
 
   app.get('/review/:token', (req, res) => {
@@ -169,21 +225,80 @@ export function createServer() {
     return res.json({ menu, recipes });
   });
 
+  app.get('/api/weekly-plan', (req, res) => {
+    const days = Math.max(3, Math.min(14, Number(req.query.days || 7)));
+    return res.json(getWeeklyPlan(days));
+  });
+
+  app.get('/api/status', (_, res) => {
+    const latestRuns = db.prepare('SELECT stage, ok, duration_ms, details, created_at FROM pipeline_runs ORDER BY id DESC LIMIT 20').all();
+    const latestMenu = db.prepare('SELECT day,status,co2_score,created_at FROM menus ORDER BY day DESC LIMIT 1').get();
+    const okRatio = latestRuns.length ? latestRuns.filter(r => r.ok === 1).length / latestRuns.length : 1;
+    return res.json({
+      ok: okRatio >= 0.8,
+      generatedAt: new Date().toISOString(),
+      latestMenu,
+      runHealth: {
+        sampleSize: latestRuns.length,
+        successRatio: Number(okRatio.toFixed(2))
+      },
+      latestRuns: latestRuns.map(r => ({ ...r, details: JSON.parse(r.details || '{}') }))
+    });
+  });
+
   app.get('/menue', (_, res) => {
-    const menus = db.prepare('SELECT day,status,co2_score FROM menus ORDER BY day DESC LIMIT 60').all();
-    const list = menus.map(m => `<li><a href="/menue/${m.day}">${m.day}</a> · ${m.status} · CO₂ ${m.co2_score}</li>`).join('');
+    const menus = db.prepare(`
+      SELECT m.day, m.status, m.co2_score,
+      (SELECT COUNT(*) FROM recipes r WHERE r.menu_id = m.id) as recipe_count
+      FROM menus m ORDER BY day DESC LIMIT 60
+    `).all();
+
+    const list = menus
+      .map(m => `<li><a href="/menue/${m.day}">${m.day}</a> · ${m.status} · CO₂ ${m.co2_score} · Rezepte ${m.recipe_count}/${EXPECTED_RECIPE_COUNT}</li>`)
+      .join('');
 
     res.send(htmlLayout({
       title: 'Menü-Archiv | lekker',
       description: 'Alle bisherigen Tagesmenüs für die Schweiz',
       canonical: '/menue',
-      body: `<h1>Menü-Archiv</h1><ul class='archive'>${list || '<li>Noch keine Einträge</li>'}</ul>`
+      body: `<h1>Menü-Archiv</h1><p class='lead'>Alle Vorschläge mit Rezept-Vollständigkeit.</p><ul class='archive'>${list || '<li>Noch keine Einträge</li>'}</ul>`
+    }));
+  });
+
+  app.get('/wochenplan', (_, res) => {
+    const weekly = getWeeklyPlan(7);
+    const menuList = weekly.menus.map(m => `<li><a href="/menue/${m.day}">${m.day}</a> · ${m.status} · CO₂ ${m.co2_score}</li>`).join('');
+    const repeats = weekly.repetition.topRepeats.length
+      ? `<ul>${weekly.repetition.topRepeats.map(r => `<li>${r.dish} <strong>(${r.count}x)</strong></li>`).join('')}</ul>`
+      : '<p>Keine Wiederholungen in den letzten Tagen 🎉</p>';
+
+    res.send(htmlLayout({
+      title: 'Wochenplan | lekker',
+      description: '7-Tage-Überblick inklusive Sichtbarkeit zu Wiederholungen.',
+      canonical: '/wochenplan',
+      body: `<h1>Wochenplan (7 Tage)</h1>
+      <section class='card'><h2>Übersicht</h2><ul class='archive'>${menuList || '<li>Noch keine Einträge</li>'}</ul></section>
+      <section class='card'><h2>Anti-Repetition Radar</h2><p>Einzigartige Gerichte: <strong>${weekly.repetition.uniqueDishCount}</strong></p>${repeats}</section>`
+    }));
+  });
+
+  app.get('/status', (_, res) => {
+    const latestRuns = db.prepare('SELECT stage, ok, duration_ms, created_at FROM pipeline_runs ORDER BY id DESC LIMIT 15').all();
+    const rows = latestRuns.map(r => `<tr><td>${r.created_at}</td><td>${r.stage}</td><td>${r.ok ? 'ok' : 'fail'}</td><td>${r.duration_ms} ms</td></tr>`).join('');
+    res.send(htmlLayout({
+      title: 'Systemstatus | lekker',
+      description: 'Laufstatus der Pipeline und letzte Ausführungen.',
+      canonical: '/status',
+      body: `<h1>Systemstatus</h1><section class='card'><table><thead><tr><th>Zeit</th><th>Stage</th><th>Status</th><th>Dauer</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Keine Runs vorhanden</td></tr>'}</tbody></table></section>
+      <p><a href='/api/status'>JSON Status API</a></p>`
     }));
   });
 
   app.get('/menue/:day', (req, res) => {
     const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(req.params.day);
     if (!menu) return res.status(404).send('Menü nicht gefunden.');
+
+    const recipeLookup = getRecipeLookup(menu.id);
 
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -199,7 +314,7 @@ export function createServer() {
       title: `Menü ${menu.day} | lekker`,
       description: `Tagesmenü mit veganen und nicht-veganen Rezeptideen für ${menu.day}.`,
       canonical: `/menue/${menu.day}`,
-      body: `<h1>Menü vom ${menu.day}</h1>${menuCards(menu)}<p><a href='/menue'>← Zurück zum Archiv</a></p>`,
+      body: `<h1>Menü vom ${menu.day}</h1>${menuCards(menu, recipeLookup)}<p><a href='/menue'>← Zurück zum Archiv</a></p>`,
       jsonLd
     }));
   });
@@ -229,10 +344,18 @@ export function createServer() {
     };
 
     const body = `
-      <article class='card'>
-        <h1>${slotLabel(slot)}: „${recipe.meta.titleMarketing || recipe.title}“</h1>
-        <p><em>${recipe.meta.subtitle || recipe.title}</em></p>
-        <p><strong>Für ${recipe.meta.servings || 1} Person</strong> · Option: ${option === 'vegan' ? 'vegan' : 'nicht-vegan'}</p>
+      <article class='card recipe'>
+        <p class='eyebrow'>${option === 'vegan' ? 'Vegan' : 'Nicht-vegan'} · ${slotLabel(slot)}</p>
+        <h1>${recipe.meta.titleMarketing || recipe.title}</h1>
+        <p class='subtitle'>${recipe.meta.subtitle || recipe.title}</p>
+
+        <section class='meta-grid'>
+          <div><strong>Portionen</strong><span>${recipe.meta.servings || 1}</span></div>
+          <div><strong>Zeit</strong><span>${recipe.meta.timeMin || '-'} Min</span></div>
+          <div><strong>Schwierigkeit</strong><span>${difficultyLabel(recipe.meta.difficulty || 1)}</span></div>
+          <div><strong>Kalorien</strong><span>ca. ${recipe.meta.kcal || '-'} kcal</span></div>
+          <div><strong>CO₂-Ampel</strong><span>${recipe.meta.co2Label || '-'}</span></div>
+        </section>
 
         <h2>Zutaten</h2>
         <ul>${ingredients}</ul>
@@ -243,12 +366,11 @@ export function createServer() {
         <h2>Einkaufs- und Kochhinweise</h2>
         <ul>${shoppingTips}${cookingTips}</ul>
 
-        <p><strong>Zeit:</strong> ${recipe.meta.timeMin || '-'} Minuten<br/>
-        <strong>Schwierigkeit:</strong> ${recipe.meta.difficulty || '-'} / 5<br/>
-        <strong>Kalorien:</strong> ca. ${recipe.meta.kcal || '-'} kcal<br/>
-        <strong>CO₂-Ampel:</strong> ${recipe.meta.co2Label || '-'}</p>
-
-        <p><a href='/menue/${day}'>← Zurück zum Menü</a></p>
+        <nav class='inline-links'>
+          <a href='/menue/${day}'>← Zurück zum Menü</a>
+          <a href='/wochenplan'>Wochenplan ansehen</a>
+          <a href='/menue'>Archiv</a>
+        </nav>
       </article>
     `;
 
@@ -262,8 +384,9 @@ export function createServer() {
   });
 
   app.get('/', (_, res) => {
-    const latest = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 1').get();
-    if (!latest) {
+    const selected = pickHomepageMenu();
+
+    if (!selected?.menu) {
       return res.send(htmlLayout({
         title: 'lekker – Tagesmenü Schweiz',
         description: 'Tägliche Menüvorschläge mit veganen und nicht-veganen Optionen.',
@@ -272,11 +395,28 @@ export function createServer() {
       }));
     }
 
+    const { menu, mode } = selected;
+    const recipeLookup = getRecipeLookup(menu.id);
+
+    const heading =
+      mode === 'today-complete'
+        ? 'Tagesmenü Schweiz'
+        : mode === 'latest-complete'
+          ? 'Neuester fertiger Menüvorschlag'
+          : 'Menü in Vorbereitung';
+
+    const intro =
+      mode === 'today-complete'
+        ? '<p class="lead">Heute frisch kuratiert mit vollständigen Rezepten.</p>'
+        : mode === 'latest-complete'
+          ? `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`
+          : '<p class="lead">Das neueste Menü wird gerade finalisiert. Rezeptlinks werden automatisch sichtbar, sobald alles bereit ist.</p>';
+
     res.send(htmlLayout({
-      title: `lekker – Menü ${latest.day}`,
-      description: 'Protein-fokussierte Tagesmenüs für den Schweizer Markt mit Rezepten.',
+      title: mode === 'today-complete' ? `lekker – Tagesmenü ${menu.day}` : `lekker – Menü ${menu.day}`,
+      description: 'Protein-fokussierte Menüvorschläge für den Schweizer Markt mit klaren Rezeptstatus.',
       canonical: '/',
-      body: `<h1>Tagesmenü Schweiz</h1>${menuCards(latest)}<p><a href='/menue'>Vergangene Menüs ansehen →</a></p>`
+      body: `<h1>${heading}</h1>${intro}${menuCards(menu, recipeLookup)}<p><a href='/menue'>Vergangene Menüs ansehen →</a></p>`
     }));
   });
 
