@@ -84,10 +84,6 @@ function menuCards(menu, recipeLookup = new Set()) {
   </section>`;
 }
 
-function getDayToday() {
-  return getTodayDayString();
-}
-
 function normalizeRecipeRow(row) {
   return {
     ...row,
@@ -148,12 +144,14 @@ export function createServer() {
     const { tab, ext } = req.params;
 
     if (tab === 'menu-today' && ext === 'json') {
-      const day = getDayToday();
-      const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
-      if (!menu) return res.status(404).json({ error: 'Noch kein Menü für heute verfügbar.' });
-      const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(menu.id)
+      const today = getTodayDayString();
+      const state = getTodayMenuState({ today });
+      if (state.state === 'missing') return res.status(404).json({ error: 'Noch kein Menü für heute verfügbar.', day: today, state: 'missing' });
+      if (state.state === 'preparing') return res.status(409).json({ error: 'Heute wird noch vorbereitet.', day: today, state: 'preparing' });
+
+      const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(state.menu.id)
         .map(normalizeRecipeRow);
-      return res.json({ menu, recipes });
+      return res.json({ menu: state.menu, recipes, state: state.state });
     }
 
     const allowedExt = ['csv', 'jsonl'];
@@ -196,7 +194,7 @@ export function createServer() {
     const result = handleReview(token, action);
 
     if (result.ok && action === 'reject') {
-      const today = getDayToday();
+      const today = getTodayDayString();
       db.prepare("UPDATE menus SET status='draft' WHERE day=?").run(today);
     }
 
@@ -214,17 +212,21 @@ export function createServer() {
   });
 
   app.get('/api/menu/today', (_, res) => {
-    const selected = getDisplayMenu();
-    if (!selected?.menu) return res.status(404).json({ error: 'Noch kein Menü verfügbar.' });
+    const today = getTodayDayString();
+    const state = getTodayMenuState({ today });
 
-    const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(selected.menu.id)
-      .map(normalizeRecipeRow);
-
-    if (recipes.length < EXPECTED_RECIPE_COUNT) {
-      return res.status(409).json({ error: 'Menü ist noch in Vorbereitung.', day: selected.menu.day, mode: selected.mode });
+    if (state.state === 'missing') {
+      return res.status(404).json({ error: 'Für heute ist noch kein Menü vorhanden.', day: today, state: 'missing' });
     }
 
-    return res.json({ menu: selected.menu, recipes, mode: selected.mode });
+    if (state.state === 'preparing') {
+      return res.status(409).json({ error: 'Heute wird noch vorbereitet.', day: today, state: 'preparing' });
+    }
+
+    const recipes = db.prepare('SELECT * FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(state.menu.id)
+      .map(normalizeRecipeRow);
+
+    return res.json({ menu: state.menu, recipes, state: state.state });
   });
 
   app.get('/api/weekly-plan', (req, res) => {

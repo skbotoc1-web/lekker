@@ -57,21 +57,38 @@ const OMNI_LIBRARY = {
   ]
 };
 
-function scoreDishByOffers(dish, offersText) {
-  return dish.keywords.reduce((score, kw) => (offersText.includes(kw) ? score + 1 : score), 0);
+const PROTEIN_KEYS = new Set(['tofu', 'kichererbsen', 'linsen', 'bohnen', 'skyr', 'eier', 'pouletbrust', 'lachs', 'forelle', 'thunfisch', 'rindfleisch']);
+
+function scoreDishByOffers(dish, offerIndex, slot) {
+  return dish.keywords.reduce((score, kw) => {
+    const base = offerIndex.get(kw) || 0;
+    const proteinBoost = PROTEIN_KEYS.has(kw) ? 1.4 : 1;
+    const slotBoost = slot === 'abendessen' && PROTEIN_KEYS.has(kw) ? 1.2 : 1;
+    return score + (base * proteinBoost * slotBoost);
+  }, 0);
 }
 
-function pickCandidate(candidates, recentMenusJoined, offersText) {
+function buildOfferIndex(day) {
+  const todayOffers = db.prepare('SELECT item, category, vegan FROM clustered_offers WHERE day = ?').all(day);
+  const joined = todayOffers.map(x => String(x.item || '').toLowerCase());
+  const idx = new Map();
+  for (const item of joined) {
+    idx.set(item, (idx.get(item) || 0) + 1);
+  }
+  return idx;
+}
+
+function pickCandidate(candidates, recentMenusJoined, offerIndex, slot) {
   const ranked = candidates
     .map(c => ({
       ...c,
-      offerScore: scoreDishByOffers(c, offersText),
+      offerScore: scoreDishByOffers(c, offerIndex, slot),
       repeated: recentMenusJoined.includes(c.name.toLowerCase())
     }))
     .sort((a, b) => {
       if (a.repeated !== b.repeated) return a.repeated ? 1 : -1;
       if (a.offerScore !== b.offerScore) return b.offerScore - a.offerScore;
-      return 0;
+      return a.name.localeCompare(b.name, 'de-CH');
     });
 
   return ranked[0].name;
@@ -80,20 +97,18 @@ function pickCandidate(candidates, recentMenusJoined, offersText) {
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
+  const offerIndex = buildOfferIndex(day);
 
-  const todayOffers = db.prepare('SELECT item FROM clustered_offers WHERE day = ?').all(day);
-  const offersText = todayOffers.map(x => String(x.item || '').toLowerCase()).join(' | ');
-
-  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offersText);
-  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offersText);
-  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offersText);
-  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offersText);
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, 'fruehstueck');
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, 'mittagessen');
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, 'abendessen');
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, 'snack');
   const veganDrink = VEGAN_LIBRARY.drink[0].name;
 
-  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offersText);
-  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offersText);
-  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offersText);
-  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offersText);
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, 'fruehstueck');
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, 'mittagessen');
+  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, 'abendessen');
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, 'snack');
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];

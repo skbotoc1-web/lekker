@@ -4,9 +4,9 @@ import { clusterOffers } from '../services/semantic.js';
 import { createDailyMenu } from '../services/menuPlanner.js';
 import { generateRecipesForMenu } from '../services/recipeService.js';
 import { appendRows } from '../services/googleSheets.js';
+import { assertCompleteSet } from '../repositories/recipeRepository.js';
 
 const TZ = 'Europe/Zurich';
-const EXPECTED_RECIPE_COUNT = 10;
 const dayStamp = () => new Date().toLocaleDateString('sv-SE', { timeZone: TZ });
 
 function persistRun({ day, stage, ok, durationMs, details }) {
@@ -95,24 +95,21 @@ async function runRecipes(day) {
   const menu = db.prepare('SELECT * FROM menus WHERE day=?').get(day);
   if (!menu) throw new Error('No menu found for day');
   const recipes = generateRecipesForMenu(menu);
+  const coverage = assertCompleteSet(recipes);
   const sink = await appendRows('recipes', recipes.map(r => [day, r.option_type, r.meal_slot, r.title, r.ingredients, r.steps, r.meta]));
-  return { ok: true, stage: 'recipes', day, count: recipes.length, sink };
+  return { ok: true, stage: 'recipes', day, count: recipes.length, coverage, sink };
 }
 
 export function createMenuAndRecipesAtomic(day) {
   const tx = db.transaction(() => {
     const menu = createDailyMenu(day);
     const recipes = generateRecipesForMenu(menu);
-    if (recipes.length !== EXPECTED_RECIPE_COUNT) {
-      throw new Error(`Recipe integrity check failed: expected ${EXPECTED_RECIPE_COUNT}, got ${recipes.length}`);
-    }
+    const coverage = assertCompleteSet(recipes);
+
     return {
       menu,
       recipes,
-      coverage: {
-        expected: EXPECTED_RECIPE_COUNT,
-        actual: recipes.length
-      }
+      coverage
     };
   });
 

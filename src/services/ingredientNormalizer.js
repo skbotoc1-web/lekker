@@ -1,9 +1,12 @@
 const STOPWORDS = [
   /\b(angebot|aktionen|rabatt|sparen|newsletter|konto|anmelden|registrieren|shop|home|mehr|jetzt|entdecken|zuruck|zurück)\b/i,
-  /\b(rezept|rezepte|kategorie|kategorien|sortiment|wochenplan|wochenangebote)\b/i,
-  /\b(airfryer|app|abo|impressum|datenschutz|kontakt|video|news)\b/i,
-  /\b(zum rezept|in den warenkorb|jetzt kaufen)\b/i
+  /\b(rezept|rezepte|kategorie|kategorien|sortiment|wochenplan|wochenangebote|prospekt)\b/i,
+  /\b(airfryer|app|abo|impressum|datenschutz|kontakt|video|news|cookie)\b/i,
+  /\b(zum rezept|in den warenkorb|jetzt kaufen|mehr erfahren)\b/i
 ];
+
+const RETAILER_NOISE = /\b(migros|coop|aldi|lidl|supermarkt|marktfrisch|aktionen)\b/i;
+const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service)\b/i;
 
 const KNOWN_INGREDIENTS = [
   { re: /\bhafer[-\s]?(fl|)ocken?\b/i, canonical: 'Haferflocken', veganLikely: true, categoryHint: 'fruehstueck' },
@@ -41,7 +44,7 @@ const KNOWN_INGREDIENTS = [
   { re: /\b(kaese|käse|mozzarella|feta|huettenkaese|hüttenkäse)\b/i, canonical: 'Käse', veganLikely: false, categoryHint: 'snack' }
 ];
 
-const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|milch|drink|fisch|fleisch|protein|bio)\b/i;
+const SOFT_FOOD_HINTS = /\b(gemuese|gemüse|obst|salat|fruechte|früchte|brot|milch|drink|fisch|fleisch|protein|bio|frisch|filet)\b/i;
 
 function fold(input) {
   return input
@@ -57,16 +60,31 @@ function sanitizeRaw(input) {
     .trim();
 }
 
+function removeUnits(input) {
+  return input
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?)\b/g, ' ')
+    .replace(/\b(ca\.?|ab|nur|statt)\b/g, ' ');
+}
+
+function cleanCandidate(original) {
+  return original
+    .replace(/[|•·:;]+/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer|Suisse|Grand|XL|Mini)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function normalizeIngredient(raw) {
   const original = sanitizeRaw(raw);
   if (!original) return null;
-  if (original.length < 3 || original.length > 80) return null;
+  if (original.length < 3 || original.length > 90) return null;
 
   const f = fold(original);
   if (/^[\d\W_]+$/.test(f)) return null;
+  if (STOPWORDS.some(re => re.test(f)) || RETAILER_NOISE.test(f) || NON_FOOD_HINTS.test(f)) return null;
 
-  const withoutUnits = f
-    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|stk|stuck|pack|beutel|x)\b/g, ' ')
+  const withoutUnits = removeUnits(f)
     .replace(/[^a-z\s-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -80,26 +98,22 @@ export function normalizeIngredient(raw) {
         source: original,
         veganLikely: rule.veganLikely,
         categoryHint: rule.categoryHint,
-        confidence: 0.95
+        confidence: 0.96
       };
     }
   }
 
   if (!SOFT_FOOD_HINTS.test(withoutUnits)) return null;
 
-  const candidate = original
-    .replace(/\b(Bio|Frisch|Aktion|Angebot|Regional|Schweiz|Schweizer)\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (candidate.length < 3 || candidate.length > 40) return null;
+  const candidate = cleanCandidate(original);
+  if (candidate.length < 3 || candidate.length > 42) return null;
 
   return {
     canonical: candidate,
     source: original,
     veganLikely: null,
     categoryHint: null,
-    confidence: 0.6
+    confidence: 0.62
   };
 }
 
@@ -131,6 +145,10 @@ export function harmonizeIngredients(rawItems = []) {
   }
 
   return [...grouped.values()]
-    .sort((a, b) => (b.mentions + b.maxConfidence) - (a.mentions + a.maxConfidence))
+    .sort((a, b) => {
+      const scoreA = a.mentions * 2 + a.maxConfidence;
+      const scoreB = b.mentions * 2 + b.maxConfidence;
+      return scoreB - scoreA;
+    })
     .map(x => ({ ...x, sources: [...x.sources] }));
 }
