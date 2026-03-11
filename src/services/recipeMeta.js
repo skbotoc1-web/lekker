@@ -10,6 +10,7 @@ const RecipeMetaSchema = z.object({
   co2Label: z.enum(co2Labels),
   titleMarketing: z.string().max(120).default(''),
   subtitle: z.string().max(180).default(''),
+  proteinHint: z.string().max(80).default(''),
   tipsShopping: z.array(z.string().min(3)).max(6).default([]),
   tipsCooking: z.array(z.string().min(3)).max(6).default([])
 });

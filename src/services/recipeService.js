@@ -15,7 +15,8 @@ function buildMeta(slot, vegan, title) {
     kcal: slot === 'abendessen' ? (vegan ? 560 : 620) : slot === 'mittagessen' ? (vegan ? 500 : 520) : slot === 'fruehstueck' ? 390 : slot === 'snack' ? 220 : 5,
     co2Label: slot === 'drink' ? 'grün' : slot === 'snack' ? 'gelb-grün' : slot === 'abendessen' ? 'gelb' : slot === 'mittagessen' ? 'gelb' : 'grün bis gelb',
     titleMarketing: '',
-    subtitle: ''
+    subtitle: '',
+    proteinHint: vegan ? 'Protein: mittel' : 'Protein: hoch'
   };
 
   if (slot === 'fruehstueck') {
@@ -33,10 +34,12 @@ function buildMeta(slot, vegan, title) {
   if (slot === 'snack') {
     base.titleMarketing = vegan ? 'Nusskraft Pause' : 'Skyr-Noisette';
     base.subtitle = `${title} als schneller Protein-Zvieri`;
+    base.proteinHint = vegan ? 'Protein: leicht-mittel' : 'Protein: mittel';
   }
   if (slot === 'drink') {
     base.titleMarketing = 'Infusion claire';
     base.subtitle = `${title} – klar, frisch und alltagstauglich`;
+    base.proteinHint = 'Protein: minimal';
   }
 
   return base;

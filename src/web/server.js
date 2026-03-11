@@ -23,7 +23,7 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <link rel="stylesheet" href="/styles.css" />
-  ${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>` : ''}
+  ${jsonLd ? (Array.isArray(jsonLd) ? jsonLd.map(ld => `<script type="application/ld+json">${JSON.stringify(ld)}</script>`).join('') : `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`) : ''}
 </head>
 <body>
   <header class="topbar">
@@ -171,7 +171,7 @@ export function createServer() {
   app.get('/sitemap.xml', (_, res) => {
     const rows = db.prepare('SELECT day FROM menus ORDER BY day DESC LIMIT 200').all();
     const urls = rows.map(r => `<url><loc>/menue/${r.day}</loc></url>`).join('');
-    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>/</loc></url><url><loc>/menue</loc></url><url><loc>/wochenplan</loc></url><url><loc>/status</loc></url>${urls}</urlset>`);
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>/</loc></url><url><loc>/was-koche-ich-heute-schweiz</loc></url><url><loc>/rezepte</loc></url><url><loc>/menue</loc></url><url><loc>/wochenplan</loc></url><url><loc>/status</loc></url><url><loc>/kategorie/schnell</loc></url><url><loc>/kategorie/low-carb</loc></url><url><loc>/kategorie/vegetarisch</loc></url><url><loc>/kategorie/vegan</loc></url>${urls}</urlset>`);
   });
 
   app.get('/review/:token', (req, res) => {
