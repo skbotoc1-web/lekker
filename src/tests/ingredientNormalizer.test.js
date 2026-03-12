@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalIngredientName, canonicalToken, normalizeIngredient, harmonizeIngredients, harmonizeIngredientCandidates, harmonizeRetailerIngredientMap, ingredientCategory } from '../services/ingredientNormalizer.js';
+import { canonicalIngredientName, canonicalToken, normalizeIngredient, harmonizeIngredients, harmonizeIngredientCandidates, harmonizeRetailerIngredientMap, ingredientCategory, normalizeIngredientMapping } from '../services/ingredientNormalizer.js';
 
 test('normalizeIngredient maps common aliases to canonical forms', () => {
   const a = normalizeIngredient('Bio Kicher-Erbsen 500g');
@@ -129,4 +129,28 @@ test('normalizeIngredient strips retailer/site noise phrases before canonical ma
 
   assert.equal(a?.canonical, 'Naturjoghurt');
   assert.equal(b?.canonical, 'Thunfisch');
+});
+
+test('normalizeIngredient maps menu-supporting extras consistently', () => {
+  assert.equal(normalizeIngredient('Vollkorntoast 1 Pack')?.canonical, 'Brot');
+  assert.equal(normalizeIngredient('Avocados 2er')?.canonical, 'Avocado');
+  assert.equal(normalizeIngredient('Maiskörner Dose')?.canonical, 'Mais');
+});
+
+test('normalizeIngredientMapping creates canonical alias map for cross-retailer labels', () => {
+  const mapped = normalizeIngredientMapping([
+    { item: 'Paprika Bio' },
+    { item: 'Peperoni rot' },
+    { item: 'Rinds Hack 2 x 500g' },
+    { item: 'Rindfleisch' }
+  ]);
+
+  const pepperoni = mapped.find(x => x.canonical === 'Peperoni');
+  const beef = mapped.find(x => x.canonical === 'Rindfleisch');
+
+  assert.ok(pepperoni);
+  assert.ok(beef);
+  assert.equal(pepperoni.mentions, 2);
+  assert.equal(beef.mentions, 2);
+  assert.equal(Array.isArray(pepperoni.aliases), true);
 });

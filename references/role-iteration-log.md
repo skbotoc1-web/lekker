@@ -204,3 +204,19 @@ Integration Review:
 - Ingredient-Normalisierung/Harmonisierung harmonisiert Retail-spezifisches Noise besser und verbessert cross-retailer Canonical-Qualität.
 - Ingredient-to-menu Matching berücksichtigt nun zusätzlich retailerübergreifende Konsens-Signale bei der Gerichtsauswahl, ohne neue Laufzeitabhängigkeiten.
 
+## Iteration 14
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Einmaliger Night-Loop strikt auf Priorität umgesetzt: Retailer-Analysequalität + Harmonisierung + Matching-Qualität + bestehende SEO/UX-Flächen konsolidiert | zu viele parallele Baustellen | Nur daten- und matchingrelevante Verbesserungen plus Validierungstests umgesetzt |
+| CTO | Crawler erweitert um Inline-Script-Fallback (`name/title/headline` Regex), Source-Scoring feinjustiert, Contract-Validierung über Tests gehärtet | zusätzliche Noise-Quelle durch Script-Parsing | harte Normalisierung + bestehendes dedupe/scoring + fallback fill-up behalten |
+| CFO | Lightweight-Guardrail eingehalten: 0 neue Dependencies, ausschließlich modulare Service/Test-Änderungen | Heuristikpflegekosten wachsen | kleine pure Helper, keine neue Runtime/Infra, testgetriebene Absicherung |
+| Designer | Intent-/Cluster-/Index-/Linkhub-/Print-Flächen bewusst stabil gehalten, keine UI-Aufblähung | begrenzter visueller Delta | Conversion- und Lesefluss erhalten, Fokus auf Content-Relevanz |
+| Nutrition Lead | Harmonisierungslayer vertieft: zusätzliche Canonicals/Synonyme (u.a. Avocado, Mais, Brot, Limette/Zitrone), Cross-Retailer Alias-Mapping (`normalizeIngredientMapping`) | Fehlklassifikation bei Longtail-Lebensmitteln | Canonical-first Ansatz + konservative Filter für Non-Food-Noise |
+| AgentOps Lead | Neue Regressionstests für Inline-Script-Extraktion, Scraper-Output-Contract, Canonical-Alias-Mapping und slot-spezifisches Menü-Matching ergänzt | geringfügig längere Tests | kleine Fixtures, Suite bleibt schlank und schnell |
+
+Integration Review:
+- Vier Händlerpfade (Migros/Coop/Aldi/Lidl) sind resilienter durch zusätzliche Fallback-Ebene und verfeinertes Source-Ranking.
+- Ingredient-Normalisierung/Harmonisierung liefert konsistentere Canonicals inkl. Alias-Transparenz für Retailer-Mapping.
+- Ingredient-to-menu Matching trifft Angebotslage besser durch slot-spezifischen Offer-Index; SEO/UX-Kernflächen bleiben aktiv und leichtgewichtig.
+

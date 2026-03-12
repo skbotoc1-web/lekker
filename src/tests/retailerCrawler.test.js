@@ -182,3 +182,22 @@ test('retailer parser can use meta title/description as final fallback source', 
   assert.equal(out.includes('Zucchini'), true);
   assert.equal(out.includes('Lachs'), true);
 });
+
+test('retailer parser can extract name signals from non-json inline scripts', () => {
+  const html = `<script>window.__STATE__={cards:[{"name":"Avocado Aktion"},{"title":"Mais 2x250g"}]}</script>`;
+  const out = parseRetailerHtml(html, 'coop').map(x => x.item);
+  assert.equal(out.includes('Avocado'), true);
+  assert.equal(out.includes('Mais'), true);
+});
+
+test('scraper validation enforces stable row schema and numeric confidence', () => {
+  const out = parseRetailerHtml('<article><h2>Paprika Bio</h2></article>', 'migros');
+  assert.equal(out.length, 10);
+  out.forEach((row) => {
+    assert.equal(typeof row.item, 'string');
+    assert.equal(typeof row.price, 'string');
+    assert.equal(typeof row.mentions, 'number');
+    assert.equal(Number.isFinite(row.confidence), true);
+    assert.ok(row.confidence >= 0 && row.confidence <= 1);
+  });
+});

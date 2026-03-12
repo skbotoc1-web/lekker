@@ -1,6 +1,6 @@
 import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
-import { canonicalToken, harmonizeRetailerIngredientMap, ingredientCategory, normalizeIngredient } from './ingredientNormalizer.js';
+import { canonicalToken, harmonizeRetailerIngredientMap, ingredientCategory, normalizeIngredient, normalizeIngredientMapping } from './ingredientNormalizer.js';
 
 const VEGAN_LIBRARY = {
   fruehstueck: [
@@ -79,7 +79,7 @@ function extractDishNameSignals(name = '') {
     .map(x => norm(x));
 }
 
-function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType) {
+function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex) {
   let matchedKeywords = 0;
 
   const keywordScore = dish.keywords.reduce((score, kw) => {
@@ -121,7 +121,11 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retaile
   const dishNameSignals = extractDishNameSignals(dish.name);
   const dishNameScore = dishNameSignals.reduce((acc, sig) => acc + Math.min(1.2, (offerIndex.get(sig) || 0) * 0.55), 0);
 
-  return keywordScore + coverageBoost + weakCoveragePenalty + (slotBoost * 0.9) + (neutralSlotBoost * 0.35) + dishNameScore;
+  const slotIndex = slotOfferIndex.get(slot) || new Map();
+  const slotKeywordHits = dish.keywords.reduce((acc, kw) => acc + (slotIndex.get(norm(kw)) || 0), 0);
+  const slotSpecificBoost = Math.min(1.4, slotKeywordHits * 0.45);
+
+  return keywordScore + coverageBoost + weakCoveragePenalty + (slotBoost * 0.9) + (neutralSlotBoost * 0.35) + dishNameScore + slotSpecificBoost;
 }
 
 function buildOfferIndex(day) {
@@ -130,6 +134,7 @@ function buildOfferIndex(day) {
   const cat = new Map();
   const slotSignals = new Map();
   const retailerSpread = new Map();
+  const slotOfferIndex = new Map();
 
   for (const row of todayOffers) {
     const normalizedRow = normalizeIngredient(row.item);
@@ -148,31 +153,41 @@ function buildOfferIndex(day) {
     slotSignals.set(`${slot}:any`, (slotSignals.get(`${slot}:any`) || 0) + 1);
     const optionKey = Number(row.vegan) === 1 ? 'vegan' : 'omni';
     slotSignals.set(`${slot}:${optionKey}`, (slotSignals.get(`${slot}:${optionKey}`) || 0) + 1);
+
+    const slotMap = slotOfferIndex.get(slot) || new Map();
+    slotMap.set(key, (slotMap.get(key) || 0) + 1);
+    slotOfferIndex.set(slot, slotMap);
   }
 
   const retailerDiversityByKey = new Map([...retailerSpread.entries()].map(([k, set]) => [k, set.size]));
-  const harmonized = harmonizeRetailerIngredientMap(
-    todayOffers.reduce((acc, row) => {
-      const retailer = row.source_retailer || 'unknown';
-      if (!acc[retailer]) acc[retailer] = [];
-      acc[retailer].push({ item: row.item });
-      return acc;
-    }, {})
-  );
+  const offersByRetailer = todayOffers.reduce((acc, row) => {
+    const retailer = row.source_retailer || 'unknown';
+    if (!acc[retailer]) acc[retailer] = [];
+    acc[retailer].push({ item: row.item });
+    return acc;
+  }, {});
+
+  const harmonized = harmonizeRetailerIngredientMap(offersByRetailer);
+  const normalizedMap = normalizeIngredientMapping(todayOffers.map(row => row.item));
   const retailerConsensus = new Map(
     Object.values(harmonized)
       .map(row => [norm(row.canonical), row.mentions])
       .filter(([key]) => Boolean(key))
   );
 
-  return { idx, cat, slotSignals, retailerDiversityByKey, retailerConsensus };
+  for (const row of normalizedMap) {
+    const key = norm(row.canonical);
+    retailerConsensus.set(key, Math.max(retailerConsensus.get(key) || 0, row.mentions));
+  }
+
+  return { idx, cat, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex };
 }
 
-function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType) {
+function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex) {
   const ranked = candidates
     .map(c => ({
       ...c,
-      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType),
+      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex),
       repeated: recentMenusJoined.includes(c.name.toLowerCase())
     }))
     .sort((a, b) => {
@@ -187,18 +202,18 @@ function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex,
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
-  const { idx: offerIndex, cat: categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus } = buildOfferIndex(day);
+  const { idx: offerIndex, cat: categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex } = buildOfferIndex(day);
 
-  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'vegan');
-  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'vegan');
-  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'vegan');
-  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'vegan');
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'vegan', slotOfferIndex);
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'vegan', slotOfferIndex);
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'vegan', slotOfferIndex);
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'vegan', slotOfferIndex);
   const veganDrink = VEGAN_LIBRARY.drink[0].name;
 
-  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni');
-  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni');
-  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni');
-  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni');
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni', slotOfferIndex);
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni', slotOfferIndex);
+  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni', slotOfferIndex);
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];

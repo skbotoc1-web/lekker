@@ -145,6 +145,24 @@ function collectMetaCandidates($) {
   return out;
 }
 
+function collectInlineScriptCandidates($) {
+  const out = [];
+  const nameRegex = /"(?:name|title|headline)"\s*:\s*"([^"\\]{3,90})"/g;
+
+  $('script').each((_, el) => {
+    const raw = $(el).html() || '';
+    if (!raw || raw.length > 2_000_000) return;
+    let match;
+    let count = 0;
+    while ((match = nameRegex.exec(raw)) && count < 60) {
+      pushCandidate(out, match[1], 'script:regex-name');
+      count += 1;
+    }
+  });
+
+  return out;
+}
+
 function collectLinkCandidates($, linkHints = []) {
   const out = [];
   if (!linkHints.length) return out;
@@ -174,6 +192,7 @@ function sourcePriority(sourceTag = '') {
   if (lowered.includes('attr:title') || lowered.includes('attr:aria')) return 1.5;
   if (lowered.includes('link:text')) return 1.2;
   if (lowered.includes('selector')) return 1;
+  if (lowered.includes('script:regex-name')) return 0.8;
   if (lowered.includes('meta:')) return 0.6;
   return 0;
 }
@@ -205,6 +224,7 @@ function sourceWeight(sourceTags = []) {
     else if (lowered.includes('attr:data')) weight += 0.15;
     else if (lowered.includes('attr:title') || lowered.includes('attr:aria')) weight += 0.12;
     else if (lowered.includes('selector')) weight += 0.08;
+    else if (lowered.includes('script:regex-name')) weight += 0.06;
     else if (lowered.includes('meta:')) weight += 0.04;
   }
   return weight;
@@ -299,7 +319,8 @@ export function parseRetailerHtml(html, retailerId) {
   const selectorCandidates = collectSelectorCandidates($, retailer.selectors);
   const linkCandidates = collectLinkCandidates($, retailer.linkHints || []);
   const metaCandidates = collectMetaCandidates($);
-  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates, ...metaCandidates]);
+  const inlineScriptCandidates = collectInlineScriptCandidates($);
+  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates, ...metaCandidates, ...inlineScriptCandidates]);
 
   const harmonized = scoreRows(harmonizeIngredientCandidates(rawCandidates).slice(0, 150));
   return validateParsedOffers(finalizeSelection(harmonized, retailerId), retailerId);

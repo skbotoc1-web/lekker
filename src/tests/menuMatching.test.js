@@ -111,3 +111,21 @@ test('menu planner maps retailer-style fish labels to canonical dish matching', 
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_dinner, 'Protein-Pasta mit Thunfisch');
 });
+
+test('menu planner uses slot-specific offer index to avoid lunch/dinner mismatch', () => {
+  const day = '2026-03-21';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'mittagessen', 0, 'Pouletbrust', 'coop');
+  insert.run(day, 'mittagessen', 0, 'Quinoa', 'migros');
+  insert.run(day, 'mittagessen', 0, 'Gurken', 'migros');
+  insert.run(day, 'mittagessen', 0, 'Tomaten', 'aldi');
+  insert.run(day, 'abendessen', 0, 'Forellenfilet', 'lidl');
+  insert.run(day, 'abendessen', 0, 'Kartoffeln', 'lidl');
+  insert.run(day, 'abendessen', 0, 'Zucchini', 'lidl');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_lunch, 'Poulet-Quinoa-Salat');
+  assert.equal(menu.omni_dinner, 'Forelle mit Ofengemüse');
+});

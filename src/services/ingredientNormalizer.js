@@ -27,6 +27,11 @@ const KNOWN_INGREDIENTS = [
   { re: /\bkarotten?|moehren?|mohren?|ruebli\b/i, canonical: 'Karotten', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\b(cherry)?tomaten?\b/i, canonical: 'Tomaten', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\bgurken?\b/i, canonical: 'Gurken', veganLikely: true, categoryHint: 'mittagessen' },
+  { re: /\bavocados?\b/i, canonical: 'Avocado', veganLikely: true, categoryHint: 'abendessen' },
+  { re: /\b(mais|maiskoerner|maiskorner|maiskolben)\b/i, canonical: 'Mais', veganLikely: true, categoryHint: 'abendessen' },
+  { re: /\bbrot|toast\b/i, canonical: 'Brot', veganLikely: true, categoryHint: 'fruehstueck' },
+  { re: /\blimetten?|limette\b/i, canonical: 'Limette', veganLikely: true, categoryHint: 'drink' },
+  { re: /\bzitronen?|zitrone\b/i, canonical: 'Zitrone', veganLikely: true, categoryHint: 'drink' },
   { re: /\baepfel|apfel\b/i, canonical: 'Äpfel', veganLikely: true, categoryHint: 'snack' },
   { re: /\bbirnen?|birne\b/i, canonical: 'Birnen', veganLikely: true, categoryHint: 'snack' },
   { re: /\bbeeren?\b/i, canonical: 'Beeren', veganLikely: true, categoryHint: 'fruehstueck' },
@@ -90,6 +95,14 @@ const TOKEN_SYNONYMS = new Map([
   ['huhnfilet', 'pouletbrust'],
   ['cherrytomaten', 'tomaten'],
   ['blattspinat', 'spinat'],
+  ['maiskolben', 'mais'],
+  ['maiskoerner', 'mais'],
+  ['maiskorner', 'mais'],
+  ['avocados', 'avocado'],
+  ['vollkorntoast', 'brot'],
+  ['toastbrot', 'brot'],
+  ['lime', 'limette'],
+  ['lemon', 'zitrone'],
   ['veggiehack', 'linsen'],
   ['bioaldisuisse', 'bio'],
   ['naturaplan', 'bio'],
@@ -116,7 +129,8 @@ export const INGREDIENT_TAXONOMY = {
   proteins: ['Tofu', 'Kichererbsen', 'Linsen', 'Bohnen', 'Skyr', 'Eier', 'Pouletbrust', 'Lachs', 'Forelle', 'Thunfisch', 'Rindfleisch'],
   carbs: ['Reis', 'Kartoffeln', 'Süsskartoffeln', 'Vollkornpasta', 'Haferflocken', 'Quinoa'],
   produce: ['Brokkoli', 'Spinat', 'Zucchini', 'Peperoni', 'Karotten', 'Tomaten', 'Gurken', 'Äpfel', 'Birnen', 'Beeren', 'Bananen'],
-  dairyAndAlt: ['Naturjoghurt', 'Käse', 'Sojadrink', 'Haferdrink']
+  dairyAndAlt: ['Naturjoghurt', 'Käse', 'Sojadrink', 'Haferdrink'],
+  extras: ['Brot', 'Mais', 'Avocado', 'Limette', 'Zitrone']
 };
 
 function fold(input) {
@@ -280,6 +294,28 @@ export function harmonizeRetailerIngredientMap(offersByRetailer = {}) {
       .map(([k, v]) => [k, { ...v, retailers: [...v.retailers].sort() }])
       .sort((a, b) => b[1].mentions - a[1].mentions)
   );
+}
+
+export function normalizeIngredientMapping(rows = []) {
+  const mapped = new Map();
+  for (const row of rows) {
+    const raw = typeof row === 'string' ? row : (row?.item || row?.value || row?.name || '');
+    const normalized = normalizeIngredient(raw);
+    if (!normalized) continue;
+    const entry = mapped.get(normalized.canonical) || {
+      canonical: normalized.canonical,
+      aliases: new Set(),
+      taxonomy: ingredientCategory(normalized.canonical),
+      mentions: 0
+    };
+    entry.aliases.add(String(raw).trim());
+    entry.mentions += 1;
+    mapped.set(normalized.canonical, entry);
+  }
+
+  return [...mapped.values()]
+    .map(x => ({ ...x, aliases: [...x.aliases].sort((a, b) => a.localeCompare(b, 'de-CH')) }))
+    .sort((a, b) => b.mentions - a.mentions || a.canonical.localeCompare(b.canonical, 'de-CH'));
 }
 
 export function harmonizeIngredientCandidates(candidates = []) {
