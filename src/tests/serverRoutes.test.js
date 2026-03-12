@@ -79,3 +79,48 @@ test('intent landing page and exports are available', async () => {
   const d = await fetch(`${baseUrl}/kategorie/schnell`);
   assert.equal(d.status, 200);
 });
+
+test('status page shows retailer food table grouped by retailer', async () => {
+  const day = '2099-12-31';
+  db.prepare('DELETE FROM clustered_offers').run();
+  db.prepare('DELETE FROM offers').run();
+
+  db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)').run(day, 'mittagessen', 0, 'Rindfleisch', 'coop');
+  db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)').run(day, 'mittagessen', 1, 'Tofu', 'migros');
+  db.prepare('INSERT INTO offers (retailer, item, price, crawled_at) VALUES (?, ?, ?, ?)').run('coop', 'Rindfleisch', 'n/a', new Date().toISOString());
+
+  const res = await fetch(`${baseUrl}/status`);
+  assert.equal(res.status, 200);
+  const html = await res.text();
+
+  assert.equal(html.includes('Ermittelte Lebensmittel je Händler'), true);
+  assert.equal(html.includes('Migros'), true);
+  assert.equal(html.includes('Coop'), true);
+  assert.equal(html.includes('Rindfleisch'), true);
+  assert.equal(html.includes('Lebensmittel neu von Händler-Webseiten fetchen'), true);
+});
+
+test('status refetch endpoint can trigger menu stage via form post', async () => {
+  const before = db.prepare('SELECT COUNT(*) as c FROM pipeline_runs').get().c;
+
+  const form = new URLSearchParams({ mode: 'menu' });
+  if (process.env.HOOK_TOKEN) form.set('token', process.env.HOOK_TOKEN);
+
+  const res = await fetch(`${baseUrl}/status/refetch-offers`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: form,
+    redirect: 'manual'
+  });
+
+  assert.equal(res.status, 303);
+  const location = res.headers.get('location') || '';
+  assert.equal(location.startsWith('/status?ok=1'), true);
+
+  const after = db.prepare('SELECT COUNT(*) as c FROM pipeline_runs').get().c;
+  assert.equal(after, before + 1);
+
+  const latest = db.prepare('SELECT stage, ok FROM pipeline_runs ORDER BY id DESC LIMIT 1').get();
+  assert.equal(latest.stage, 'menu');
+  assert.equal(latest.ok, 1);
+});

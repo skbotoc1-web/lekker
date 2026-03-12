@@ -10,6 +10,15 @@ import { EXPECTED_RECIPE_COUNT, getRecipeLookup } from '../repositories/recipeRe
 
 const FEEDS_DIR = path.resolve('data/feeds');
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function htmlLayout({ title, description, canonical, body, jsonLd }) {
   return `<!doctype html>
 <html lang="de-CH">
@@ -126,10 +135,33 @@ function renderInfoState({ title, message, backLinks = [] }) {
   return `<article class='card'><h1>${title}</h1><p class='lead'>${message}</p>${links}</article>`;
 }
 
+function retailerLabel(retailer) {
+  const map = {
+    migros: 'Migros',
+    coop: 'Coop',
+    aldi: 'Aldi Suisse',
+    lidl: 'Lidl'
+  };
+  return map[retailer] || retailer || 'Unbekannt';
+}
+
+function orderedRetailers(list = []) {
+  const order = ['migros', 'coop', 'aldi', 'lidl'];
+  return [...list].sort((a, b) => {
+    const ia = order.indexOf(a);
+    const ib = order.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b, 'de-CH');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 export function createServer() {
   const app = express();
   app.use(express.static('public'));
   app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: false }));
 
   app.get('/health', (_, res) => res.json({ ok: true }));
 
@@ -332,14 +364,89 @@ export function createServer() {
     }));
   });
 
-  app.get('/status', (_, res) => {
+  app.post('/status/refetch-offers', async (req, res) => {
+    const expected = process.env.HOOK_TOKEN;
+    const provided = req.body?.token;
+    const modeRaw = String(req.body?.mode || 'offers').toLowerCase();
+    const mode = ['offers', 'menu', 'recipes', 'full'].includes(modeRaw) ? modeRaw : 'offers';
+
+    if (expected && provided !== expected) {
+      return res.redirect(303, `/status?ok=0&notice=${encodeURIComponent('Hook-Token fehlt oder ist ungültig.')}`);
+    }
+
+    try {
+      if (mode === 'offers') {
+        await runHook('ingestion');
+        await runHook('clustering');
+      } else {
+        await runHook(mode);
+      }
+
+      const notice =
+        mode === 'offers'
+          ? 'Lebensmittel wurden neu von den Händler-Webseiten geholt und geclustert.'
+          : `Pipeline-Stage "${mode}" wurde erfolgreich ausgeführt.`;
+
+      return res.redirect(303, `/status?ok=1&notice=${encodeURIComponent(notice)}`);
+    } catch (error) {
+      return res.redirect(303, `/status?ok=0&notice=${encodeURIComponent(`Fehler beim Ausführen: ${error.message}`)}`);
+    }
+  });
+
+  app.get('/status', (req, res) => {
     const latestRuns = db.prepare('SELECT stage, ok, duration_ms, created_at FROM pipeline_runs ORDER BY id DESC LIMIT 15').all();
-    const rows = latestRuns.map(r => `<tr><td>${r.created_at}</td><td>${r.stage}</td><td>${r.ok ? 'ok' : 'fail'}</td><td>${r.duration_ms} ms</td></tr>`).join('');
+    const rows = latestRuns.map(r => `<tr><td>${escapeHtml(r.created_at)}</td><td>${escapeHtml(r.stage)}</td><td>${r.ok ? 'ok' : 'fail'}</td><td>${r.duration_ms} ms</td></tr>`).join('');
+
+    const latestClusterDay = db.prepare('SELECT day FROM clustered_offers ORDER BY day DESC LIMIT 1').get()?.day;
+    const clusteredRows = latestClusterDay
+      ? db.prepare('SELECT source_retailer as retailer, item, COUNT(*) as c FROM clustered_offers WHERE day=? GROUP BY source_retailer, item ORDER BY source_retailer, c DESC, item').all(latestClusterDay)
+      : [];
+
+    const rawCrawlerRows = db.prepare('SELECT retailer, MAX(crawled_at) as crawled_at FROM offers GROUP BY retailer').all();
+    const rawCrawlerByRetailer = new Map(rawCrawlerRows.map(r => [r.retailer, r.crawled_at]));
+
+    const byRetailer = new Map();
+    for (const row of clusteredRows) {
+      if (!byRetailer.has(row.retailer)) byRetailer.set(row.retailer, []);
+      byRetailer.get(row.retailer).push({ item: row.item, count: row.c });
+    }
+
+    const retailerKeys = orderedRetailers(new Set([...byRetailer.keys(), ...rawCrawlerByRetailer.keys()]));
+    const retailerTableRows = retailerKeys.map(retailer => {
+      const items = byRetailer.get(retailer) || [];
+      const list = items.length
+        ? `<ul class='status-items'>${items.slice(0, 12).map(x => `<li>${escapeHtml(x.item)}${x.count > 1 ? ` (${x.count})` : ''}</li>`).join('')}${items.length > 12 ? `<li>+${items.length - 12} weitere …</li>` : ''}</ul>`
+        : '<span class="meta-inline">Keine clusterbaren Lebensmittel gefunden</span>';
+      const crawledAt = rawCrawlerByRetailer.get(retailer);
+      return `<tr><td>${escapeHtml(retailerLabel(retailer))}</td><td>${items.length}</td><td>${escapeHtml(crawledAt || '-')}</td><td>${list}</td></tr>`;
+    }).join('');
+
+    const notice = typeof req.query.notice === 'string' ? req.query.notice : '';
+    const noticeOk = req.query.ok === '1';
+    const noticeBlock = notice
+      ? `<section class='status-row'><span class='badge ${noticeOk ? 'ok' : 'warn'}'>${noticeOk ? 'OK' : 'Hinweis'}</span><span>${escapeHtml(notice)}</span></section>`
+      : '';
+
+    const tokenHint = process.env.HOOK_TOKEN
+      ? `<p class='meta-inline'>Hook-Token erforderlich.</p><label class='meta-inline'>Token <input type='password' name='token' autocomplete='off' /></label>`
+      : '';
+
     res.send(htmlLayout({
       title: 'Systemstatus | lekker',
-      description: 'Laufstatus der Pipeline und letzte Ausführungen.',
+      description: 'Laufstatus der Pipeline, Händler-Lebensmittel und Trigger für Re-Fetch.',
       canonical: '/status',
-      body: `<h1>Systemstatus</h1><section class='card'><div class='table-wrap'><table><thead><tr><th>Zeit</th><th>Stage</th><th>Status</th><th>Dauer</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Keine Runs vorhanden</td></tr>'}</tbody></table></div></section>
+      body: `<h1>Systemstatus</h1>${noticeBlock}
+      <section class='card'>
+        <h2>Aktionen</h2>
+        <form method='post' action='/status/refetch-offers' class='status-action-form'>
+          <input type='hidden' name='mode' value='offers' />
+          ${tokenHint}
+          <button type='submit' class='ghost-btn'>Lebensmittel neu von Händler-Webseiten fetchen</button>
+        </form>
+        <p class='meta-inline'>Löst Ingestion + Clustering aus und aktualisiert die Lebensmittel-Tabelle unten.</p>
+      </section>
+      <section class='card'><h2>Pipeline Runs</h2><div class='table-wrap'><table><thead><tr><th>Zeit</th><th>Stage</th><th>Status</th><th>Dauer</th></tr></thead><tbody>${rows || '<tr><td colspan="4">Keine Runs vorhanden</td></tr>'}</tbody></table></div></section>
+      <section class='card'><h2>Ermittelte Lebensmittel je Händler${latestClusterDay ? ` (${escapeHtml(latestClusterDay)})` : ''}</h2><div class='table-wrap'><table><thead><tr><th>Händler</th><th>Anzahl Items</th><th>Letzter Crawl</th><th>Lebensmittel</th></tr></thead><tbody>${retailerTableRows || '<tr><td colspan="4">Noch keine Händler-Daten vorhanden</td></tr>'}</tbody></table></div></section>
       <p><a href='/api/status'>JSON Status API</a></p>`
     }));
   });
