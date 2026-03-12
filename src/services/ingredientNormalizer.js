@@ -144,6 +144,11 @@ export function canonicalToken(value) {
   return normalizeToken(value);
 }
 
+export function canonicalIngredientName(raw) {
+  const normalized = normalizeIngredient(raw);
+  return normalized?.canonical || null;
+}
+
 export function ingredientCategory(canonical) {
   for (const [group, values] of Object.entries(INGREDIENT_TAXONOMY)) {
     if (values.includes(canonical)) return group;
@@ -231,6 +236,27 @@ export function harmonizeIngredients(rawItems = []) {
       return scoreB - scoreA;
     })
     .map(x => ({ ...x, sources: [...x.sources] }));
+}
+
+export function harmonizeRetailerIngredientMap(offersByRetailer = {}) {
+  const out = {};
+
+  for (const [retailer, rows] of Object.entries(offersByRetailer)) {
+    for (const row of rows || []) {
+      const raw = typeof row === 'string' ? row : (row?.item || row?.value || '');
+      const canonical = canonicalIngredientName(raw);
+      if (!canonical) continue;
+      if (!out[canonical]) out[canonical] = { canonical, retailers: new Set(), mentions: 0, taxonomy: ingredientCategory(canonical) };
+      out[canonical].retailers.add(retailer);
+      out[canonical].mentions += 1;
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(out)
+      .map(([k, v]) => [k, { ...v, retailers: [...v.retailers].sort() }])
+      .sort((a, b) => b[1].mentions - a[1].mentions)
+  );
 }
 
 export function harmonizeIngredientCandidates(candidates = []) {

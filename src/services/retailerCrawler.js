@@ -11,7 +11,7 @@ const retailers = [
       '[class*="product"] [class*="title"]', '[class*="offer"] [class*="title"]', '[class*="m-product"] [title]',
       '[class*="product"] [data-product-name]', '[class*="tile"] [aria-label]', '[class*="tile"] [data-title]',
       '[data-testid*="product"] [aria-label]', 'article h2', 'article h3',
-      'a[title*="Bio"]', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]'
+      'a[title*="Bio"]', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]', 'img[alt]', 'button[aria-label]'
     ]
   },
   {
@@ -22,7 +22,7 @@ const retailers = [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="tile"] [class*="headline"]',
       '[class*="teaser"] [class*="title"]', '[data-qa*="product"] [title]', '[data-qa*="product"] [aria-label]',
       '[class*="offer"] [data-name]', '[class*="article"] [title]', '[class*="product"] [data-name]',
-      'article h2', 'article h3', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]'
+      'article h2', 'article h3', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]', 'img[alt]', 'button[aria-label]'
     ]
   },
   {
@@ -33,7 +33,7 @@ const retailers = [
       '[class*="offer"] h2', '[class*="offer"] h3', '[class*="product"] h2', '[class*="product"] h3',
       '[class*="teaser"] [class*="title"]', '[class*="mod-offer"] [title]', '[class*="mod-offer"] [aria-label]',
       '[class*="mod-offer"] [data-title]', '[class*="product"] [data-name]', '[data-title]',
-      '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]'
+      '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]', 'img[alt]', 'button[aria-label]'
     ]
   },
   {
@@ -44,7 +44,7 @@ const retailers = [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="offer"] h2', '[class*="offer"] h3',
       '[class*="tile"] [class*="title"]', '[class*="product-grid"] [title]', '[class*="product-grid"] [aria-label]',
       '[class*="product-grid"] [data-title]', '[class*="product"] [data-name]',
-      '[data-product-name]', '[data-name]', '[data-title]', 'article h2', 'article h3', 'a[title]'
+      '[data-product-name]', '[data-name]', '[data-title]', 'article h2', 'article h3', 'a[title]', 'img[alt]', 'button[aria-label]'
     ]
   }
 ];
@@ -230,6 +230,29 @@ function finalizeSelection(harmonized, retailerId) {
   return [...selected, ...fill].slice(0, 10);
 }
 
+function validateParsedOffers(rows, retailerId) {
+  const unique = [];
+  const seen = new Set();
+  for (const row of rows || []) {
+    const item = String(row?.item || '').trim();
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    unique.push({
+      item,
+      price: row?.price || 'n/a',
+      mentions: Number(row?.mentions || 1),
+      confidence: Number.isFinite(row?.confidence) ? row.confidence : 0.5,
+      source: row?.source || 'parsed'
+    });
+  }
+
+  const clipped = unique.slice(0, 10);
+  if (clipped.length === 10) return clipped;
+
+  const filler = fallbackFor(retailerId).filter(x => !seen.has(x.item)).slice(0, 10 - clipped.length);
+  return [...clipped, ...filler].slice(0, 10);
+}
+
 export function parseRetailerHtml(html, retailerId) {
   const retailer = retailers.find(r => r.id === retailerId);
   if (!retailer) throw new Error(`Unknown retailer ${retailerId}`);
@@ -241,7 +264,7 @@ export function parseRetailerHtml(html, retailerId) {
   const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates]);
 
   const harmonized = scoreRows(harmonizeIngredientCandidates(rawCandidates).slice(0, 150));
-  return finalizeSelection(harmonized, retailerId);
+  return validateParsedOffers(finalizeSelection(harmonized, retailerId), retailerId);
 }
 
 export async function crawlRetailer(retailerId) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { canonicalToken, normalizeIngredient, harmonizeIngredients, harmonizeIngredientCandidates, ingredientCategory } from '../services/ingredientNormalizer.js';
+import { canonicalIngredientName, canonicalToken, normalizeIngredient, harmonizeIngredients, harmonizeIngredientCandidates, harmonizeRetailerIngredientMap, ingredientCategory } from '../services/ingredientNormalizer.js';
 
 test('normalizeIngredient maps common aliases to canonical forms', () => {
   const a = normalizeIngredient('Bio Kicher-Erbsen 500g');
@@ -93,4 +93,22 @@ test('normalizeIngredient harmonizes swiss retailer aliases to canonical ingredi
   assert.equal(a?.canonical, 'Rindfleisch');
   assert.equal(b?.canonical, 'Tomaten');
   assert.equal(c?.canonical, 'Spinat');
+});
+
+test('canonicalIngredientName returns null for noise and canonical for valid labels', () => {
+  assert.equal(canonicalIngredientName('Datenschutz und Cookie'), null);
+  assert.equal(canonicalIngredientName('2 x 500g Lachsfilet Aktion'), 'Lachs');
+});
+
+test('harmonizeRetailerIngredientMap builds cross-retailer canonical view', () => {
+  const mapped = harmonizeRetailerIngredientMap({
+    migros: [{ item: 'Paprika Bio' }, { item: 'Rinds Hack 2 x 500g' }],
+    coop: [{ item: 'Peperoni rot' }, { item: 'Rindfleisch' }],
+    lidl: [{ item: 'Lachsfilet' }]
+  });
+
+  assert.equal(mapped.Peperoni.mentions, 2);
+  assert.deepEqual(mapped.Peperoni.retailers, ['coop', 'migros']);
+  assert.equal(mapped.Rindfleisch.mentions, 2);
+  assert.equal(mapped.Lachs.taxonomy, 'proteins');
 });

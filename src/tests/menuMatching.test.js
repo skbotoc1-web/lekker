@@ -85,3 +85,16 @@ test('menu planner aligns vegan dinner with cross-retailer harmonized offers', (
   const menu = createDailyMenu(day);
   assert.equal(menu.vegan_dinner, 'Süsskartoffel-Tofu-Blech');
 });
+
+test('menu planner normalizes raw offer labels before scoring dishes', () => {
+  const day = '2026-03-19';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'mittagessen', 0, 'Rinds Hack 2 x 500g', 'coop');
+  insert.run(day, 'mittagessen', 0, 'Paprika Bio', 'aldi');
+  insert.run(day, 'mittagessen', 0, 'Reis', 'migros');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_lunch, 'Rindstreifen mit Vollkornreis');
+});

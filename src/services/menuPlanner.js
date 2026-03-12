@@ -103,10 +103,11 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retaile
 
   const coverage = dish.keywords.length ? matchedKeywords / dish.keywords.length : 0;
   const coverageBoost = coverage * 1.8;
+  const weakCoveragePenalty = dish.keywords.length >= 2 && coverage < 0.34 ? -0.55 : 0;
 
   const slotBoost = slotSignals.get(`${slot}:${optionType}`) || 0;
   const neutralSlotBoost = slotSignals.get(`${slot}:any`) || 0;
-  return keywordScore + coverageBoost + (slotBoost * 0.9) + (neutralSlotBoost * 0.35);
+  return keywordScore + coverageBoost + weakCoveragePenalty + (slotBoost * 0.9) + (neutralSlotBoost * 0.35);
 }
 
 function buildOfferIndex(day) {
@@ -117,10 +118,12 @@ function buildOfferIndex(day) {
   const retailerSpread = new Map();
 
   for (const row of todayOffers) {
-    const key = norm(row.item);
+    const normalizedRow = normalizeIngredient(row.item);
+    const canonicalItem = normalizedRow?.canonical || row.item;
+    const key = norm(canonicalItem);
     if (!key) continue;
     idx.set(key, (idx.get(key) || 0) + 1);
-    const taxonomy = ingredientCategory(row.item);
+    const taxonomy = ingredientCategory(canonicalItem);
     cat.set(taxonomy, (cat.get(taxonomy) || 0) + 1);
 
     const retailerSet = retailerSpread.get(key) || new Set();

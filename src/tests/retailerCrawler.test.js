@@ -154,3 +154,17 @@ test('retailer parser uses retailer link-hints as fallback extraction path', () 
   assert.equal(out.includes('Tomaten'), true);
   assert.equal(out.includes('Lachs'), true);
 });
+
+test('retailer parser also uses image alt and button aria labels as weak fallback', () => {
+  const html = `
+    <img alt="Bio Brokkoli 500g" />
+    <button aria-label="Rinds Hack 2 x 500g"></button>
+  `;
+
+  const out = parseRetailerHtml(html, 'migros');
+  const items = out.map(x => x.item);
+  assert.equal(items.includes('Brokkoli'), true);
+  assert.equal(items.includes('Rindfleisch'), true);
+  assert.equal(new Set(items).size, out.length);
+  assert.equal(out.length, 10);
+});

@@ -156,3 +156,19 @@ Integration Review:
 - Ingredient-Harmonisierung liefert konsistentere Canonicals und reduziert retail-spezifisches Labelrauschen weiter.
 - Menü-Matching nutzt Taxonomie robuster (Keyword-Normalisierung via normalizer), bleibt leichtgewichtig (SSR/SQLite, keine neuen Pakete).
 
+## Iteration 11
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Einen klaren Overnight-Loop auf Priorität „4 Retailer Extraction-Qualität + Ingredient-Harmonisierung + Matching-Fit“ abgeschlossen | Scope creep via zusätzliche UX-Wünsche | SEO/UX nur stabilisiert, Fokus auf Daten-/Matching-Qualität |
+| CTO | Scraper-Heuristik erweitert (img-alt/button-aria als schwache Fallback-Quelle), parser-output validiert (Dedup + length contract), offer-normalization vor Matching ergänzt | zusätzliche Heuristik kann Noise ziehen | confidence/scoring + starke Stopwords + fallback-fill als Safety-Net |
+| CFO | Lightweight gehalten: 0 neue Dependencies, nur bestehende Service-Funktionen + Tests erweitert | steigende Regelkomplexität | modulare pure helpers + klare Testkontrakte pro Risiko |
+| Designer | Bestehende Intent-/Cluster-/Index-/Print-Flows unverändert gelassen, damit keine neue UI-Schwere entsteht | begrenzte visuelle Neuerung | Stabilität und Klarheit vor Oberfläche |
+| Nutrition Lead | Canonical-Layer vertieft (`canonicalIngredientName`, retailer-harmonized map), bessere Synonym-zu-Canonical-Konsistenz über Händler | Fehlmappings bei Randbegriffen | nur bekannte Canonicals hoch priorisieren, conservative null für Noise |
+| AgentOps Lead | Neue Validierungstests für Scraper-Fallback, retailer-harmonized mapping und raw-offer-normalization im Menü-Matching ergänzt | leicht längere Tests | kleine Fixtures, schneller lokaler Lauf bleibt erhalten |
+
+Integration Review:
+- Extraktionsqualität für Migros/Coop/Aldi/Lidl robuster durch zusätzliche Fallback-Signale und parser output validation.
+- Ingredient-Normalisierung/Harmonisierung liefert konsistentere Canonicals auch in cross-retailer Sicht.
+- Menüauswahl passt besser zu realen Offer-Labels (z.B. „Rinds Hack 2 x 500g“ → Rindstreifen-Gericht), Architektur bleibt leichtgewichtig (SSR + SQLite).
+
