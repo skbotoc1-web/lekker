@@ -18,13 +18,13 @@ const KNOWN_INGREDIENTS = [
   { re: /\breis\b/i, canonical: 'Reis', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\b(vollkorn)?pasta|nudeln?\b/i, canonical: 'Vollkornpasta', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bbrokkoli\b/i, canonical: 'Brokkoli', veganLikely: true, categoryHint: 'abendessen' },
-  { re: /\bspinat\b/i, canonical: 'Spinat', veganLikely: true, categoryHint: 'mittagessen' },
+  { re: /\b(blatt)?spinat\b/i, canonical: 'Spinat', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\b(zucchini|zucchetti|courgette)\b/i, canonical: 'Zucchini', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\b(peperoni|paprika)\b/i, canonical: 'Peperoni', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\bkartoffeln?\b/i, canonical: 'Kartoffeln', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bsuesskartoffeln?|susskartoffeln?\b/i, canonical: 'Süsskartoffeln', veganLikely: true, categoryHint: 'abendessen' },
   { re: /\bkarotten?|moehren?|mohren?|ruebli\b/i, canonical: 'Karotten', veganLikely: true, categoryHint: 'mittagessen' },
-  { re: /\btomaten?\b/i, canonical: 'Tomaten', veganLikely: true, categoryHint: 'mittagessen' },
+  { re: /\b(cherry)?tomaten?\b/i, canonical: 'Tomaten', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\bgurken?\b/i, canonical: 'Gurken', veganLikely: true, categoryHint: 'mittagessen' },
   { re: /\baepfel|apfel\b/i, canonical: 'Äpfel', veganLikely: true, categoryHint: 'snack' },
   { re: /\bbirnen?|birne\b/i, canonical: 'Birnen', veganLikely: true, categoryHint: 'snack' },
@@ -81,9 +81,14 @@ const TOKEN_SYNONYMS = new Map([
   ['filet', 'filet'],
   ['brustfilet', 'pouletbrust'],
   ['rinderhack', 'rindfleisch'],
+  ['rindshack', 'rindfleisch'],
+  ['hackfleisch', 'rindfleisch'],
   ['thunfischsteak', 'thunfisch'],
   ['rindsentrecote', 'rindfleisch'],
   ['pouletgeschnetzeltes', 'pouletbrust'],
+  ['huhnfilet', 'pouletbrust'],
+  ['cherrytomaten', 'tomaten'],
+  ['blattspinat', 'spinat'],
   ['veggiehack', 'linsen']
 ]);
 
@@ -110,10 +115,11 @@ function sanitizeRaw(input) {
 
 function removeUnits(input) {
   return input
-    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose|glas|schale|becher)\b/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose|glas|schale|becher|tranche|scheiben?)\b/g, ' ')
     .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
+    .replace(/\b\d+er\b/g, ' ')
     .replace(/\b(ca\.?|ab|nur|statt|pro|per|je|nur heute|solange vorrat)\b/g, ' ')
-    .replace(/\b(chf|fr\.?|preis|statt\s*chf\s*\d+)\b/g, ' ')
+    .replace(/\b(chf|fr\.?|preis|statt\s*chf\s*\d+(?:[.,]\d+)?)\b/g, ' ')
     .replace(/\b(kaliber|klasse|gr\.?|gross|klein|mittel|aktion|sonderpreis|promo|wochenhit)\b/g, ' ')
     .replace(/\b\d{1,3}%\b/g, ' ');
 }

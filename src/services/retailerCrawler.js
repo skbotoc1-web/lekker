@@ -5,38 +5,45 @@ const retailers = [
   {
     id: 'migros',
     url: 'https://www.migros.ch/de/offers/home',
+    linkHints: ['/product/', '/produkt/', '/p/', '/offers/'],
     selectors: [
       '[data-testid*="product"] h2', '[data-testid*="product"] h3', '[data-testid*="offer"] h2',
       '[class*="product"] [class*="title"]', '[class*="offer"] [class*="title"]', '[class*="m-product"] [title]',
-      '[class*="product"] [data-product-name]', '[class*="tile"] [aria-label]', 'article h2', 'article h3',
+      '[class*="product"] [data-product-name]', '[class*="tile"] [aria-label]', '[class*="tile"] [data-title]',
+      '[data-testid*="product"] [aria-label]', 'article h2', 'article h3',
       'a[title*="Bio"]', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]'
     ]
   },
   {
     id: 'coop',
     url: 'https://www.coop.ch/de/',
+    linkHints: ['/de/produkte/', '/de/aktionen/', '/p/'],
     selectors: [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="tile"] [class*="headline"]',
       '[class*="teaser"] [class*="title"]', '[data-qa*="product"] [title]', '[data-qa*="product"] [aria-label]',
-      '[class*="offer"] [data-name]', '[class*="article"] [title]', 'article h2', 'article h3', 'a[title]',
-      '[data-product-name]', '[data-name]', '[data-title]'
+      '[class*="offer"] [data-name]', '[class*="article"] [title]', '[class*="product"] [data-name]',
+      'article h2', 'article h3', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]'
     ]
   },
   {
     id: 'aldi',
     url: 'https://www.aldi-suisse.ch/de/aktionen-und-angebote.html',
+    linkHints: ['/produkt/', '/angebote/', '/p/'],
     selectors: [
       '[class*="offer"] h2', '[class*="offer"] h3', '[class*="product"] h2', '[class*="product"] h3',
       '[class*="teaser"] [class*="title"]', '[class*="mod-offer"] [title]', '[class*="mod-offer"] [aria-label]',
-      '[data-title]', '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]'
+      '[class*="mod-offer"] [data-title]', '[class*="product"] [data-name]', '[data-title]',
+      '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]'
     ]
   },
   {
     id: 'lidl',
     url: 'https://www.lidl.ch/',
+    linkHints: ['/p/', '/produkt/', '/angebote/'],
     selectors: [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="offer"] h2', '[class*="offer"] h3',
       '[class*="tile"] [class*="title"]', '[class*="product-grid"] [title]', '[class*="product-grid"] [aria-label]',
+      '[class*="product-grid"] [data-title]', '[class*="product"] [data-name]',
       '[data-product-name]', '[data-name]', '[data-title]', 'article h2', 'article h3', 'a[title]'
     ]
   }
@@ -117,12 +124,34 @@ function collectSelectorCandidates($, selectors) {
   return out;
 }
 
+function collectLinkCandidates($, linkHints = []) {
+  const out = [];
+  if (!linkHints.length) return out;
+
+  $('a[href]').each((_, el) => {
+    const href = String($(el).attr('href') || '').toLowerCase();
+    if (!href) return;
+    if (!linkHints.some(hint => href.includes(String(hint).toLowerCase()))) return;
+
+    const txt = $(el).text()?.trim();
+    const title = $(el).attr('title');
+    const aria = $(el).attr('aria-label');
+    if (txt) pushCandidate(out, txt, `link:text:${href.slice(0, 48)}`);
+    if (title) pushCandidate(out, title, `link:title:${href.slice(0, 48)}`);
+    if (aria) pushCandidate(out, aria, `link:aria:${href.slice(0, 48)}`);
+  });
+
+  return out;
+}
+
 function sourcePriority(sourceTag = '') {
   const lowered = String(sourceTag).toLowerCase();
   if (lowered.includes('__next_data__')) return 4;
   if (lowered.includes('ld+json')) return 3;
   if (lowered.includes('attr:data')) return 2;
+  if (lowered.includes('link:title') || lowered.includes('link:aria')) return 1.75;
   if (lowered.includes('attr:title') || lowered.includes('attr:aria')) return 1.5;
+  if (lowered.includes('link:text')) return 1.2;
   if (lowered.includes('selector')) return 1;
   return 0;
 }
@@ -184,10 +213,12 @@ function finalizeSelection(harmonized, retailerId) {
   const selected = [];
   const seen = new Set();
 
-  for (const row of harmonized) {
+  const strict = harmonized.filter(row => row.maxConfidence >= 0.58 || row.mentions >= 2);
+  const relaxed = harmonized.filter(row => row.maxConfidence >= 0.54 || row.mentions >= 1);
+
+  for (const row of [...strict, ...relaxed]) {
     const item = row.canonical;
     if (seen.has(item)) continue;
-    if (row.maxConfidence < 0.58 && row.mentions < 2) continue;
     seen.add(item);
     selected.push({ item, price: 'n/a', mentions: row.mentions, confidence: row.maxConfidence, source: 'parsed' });
     if (selected.length >= 10) break;
@@ -206,7 +237,8 @@ export function parseRetailerHtml(html, retailerId) {
   const $ = cheerio.load(html || '');
   const jsonCandidates = collectJsonNames($);
   const selectorCandidates = collectSelectorCandidates($, retailer.selectors);
-  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates]);
+  const linkCandidates = collectLinkCandidates($, retailer.linkHints || []);
+  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates]);
 
   const harmonized = scoreRows(harmonizeIngredientCandidates(rawCandidates).slice(0, 150));
   return finalizeSelection(harmonized, retailerId);

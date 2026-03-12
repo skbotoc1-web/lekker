@@ -143,3 +143,14 @@ test('retailer parser prefers stronger JSON source and removes duplicate noise',
   const pepperoniRows = out.filter(x => x.item === 'Peperoni');
   assert.equal(pepperoniRows.length, 1);
 });
+
+test('retailer parser uses retailer link-hints as fallback extraction path', () => {
+  const html = `
+    <a href="/de/produkte/gemuese/cherrytomaten" title="Cherrytomaten Bio 250g">zum produkt</a>
+    <a href="/de/produkte/fisch/lachsfilet" aria-label="Lachsfilet frisch">fisch</a>
+  `;
+
+  const out = parseRetailerHtml(html, 'coop').map(x => x.item);
+  assert.equal(out.includes('Tomaten'), true);
+  assert.equal(out.includes('Lachs'), true);
+});

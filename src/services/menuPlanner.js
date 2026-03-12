@@ -1,6 +1,6 @@
 import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
-import { canonicalToken, ingredientCategory } from './ingredientNormalizer.js';
+import { canonicalToken, ingredientCategory, normalizeIngredient } from './ingredientNormalizer.js';
 
 const VEGAN_LIBRARY = {
   fruehstueck: [
@@ -91,7 +91,8 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retaile
 
     const proteinBoost = PROTEIN_KEYS.has(key) ? 1.4 : 1;
     const dinnerProteinBoost = slot === 'abendessen' && PROTEIN_KEYS.has(key) ? 1.2 : 1;
-    const taxonomy = ingredientCategory(kw.charAt(0).toUpperCase() + kw.slice(1));
+    const normalizedKeyword = normalizeIngredient(kw);
+    const taxonomy = normalizedKeyword?.taxonomy || ingredientCategory(kw.charAt(0).toUpperCase() + kw.slice(1));
     const taxonomyPresence = categoryIndex.get(taxonomy) || 0;
     const categoryBoost = taxonomyPresence > 0 ? 1.12 + Math.min(0.1, taxonomyPresence * 0.02) : 1;
     const retailerSpread = Math.max(retailerDiversityByKey.get(key) || 0, fuzzyRetailers);

@@ -84,3 +84,13 @@ test('normalizeIngredient cleans retail labels, prices and unit clutter', () => 
   assert.equal(b?.canonical, 'Naturjoghurt');
   assert.equal(c?.canonical, 'Zucchini');
 });
+
+test('normalizeIngredient harmonizes swiss retailer aliases to canonical ingredient names', () => {
+  const a = normalizeIngredient('Rindshack 3er Pack 450g');
+  const b = normalizeIngredient('Cherrytomaten Bio');
+  const c = normalizeIngredient('Blattspinat frisch');
+
+  assert.equal(a?.canonical, 'Rindfleisch');
+  assert.equal(b?.canonical, 'Tomaten');
+  assert.equal(c?.canonical, 'Spinat');
+});

@@ -140,3 +140,19 @@ Integration Review:
 - Ingredient-Normalisierung/Harmonisierung verbessert Canonical-Qualität und reduziert Label-/Preisrauschen.
 - Menü-Matching richtet sich stärker nach realer Angebotslage (inkl. retailer-diversity Signal), bei unverändert leichtgewichtiger Architektur.
 
+## Iteration 10
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Einen fokussierten Night-Loop auf Händlerdatenqualität + Mapping + Matching abgeschlossen; SEO/UX-Flächen stabil gehalten statt Scope-Erweiterung | zu wenig sichtbare UI-Neuerung | Impact vor Oberfläche: Datenqualität zuerst |
+| CTO | Retailer-Crawler pro Händler vertieft: zusätzliche Selektoren, neue Link-Hint-Fallback-Extraktion, relaxte-but-scored Finalauswahl statt hartem Cutoff | mehr Heuristikfläche | source-priority + fallback-fill als robuste Kette |
+| CFO | Lightweight-Guardrail gehalten: 0 neue Runtime-Dependencies, nur bestehende Module/Tests erweitert | langfristige Wartungskosten | modulare Helper + Contract-Tests als Absicherung |
+| Designer | Bestehende Intent-/Cluster-/Index-/Internal-Link-Hubs bewusst unverändert gehalten, um UX nicht zu überladen | wahrgenommene Stagnation | Conversionpfad stabil, keine UI-Schwere |
+| Nutrition Lead | Canonical-Harmonisierung erweitert (Rindshack, Cherrytomaten, Blattspinat), Unit-/Preis-Cleanup verbessert; Canonical-Namen konsistenter über Händler | Fehlklassifikation bei Randbegriffen | bekannte Canonicals priorisiert, Soft-Fallback bleibt |
+| AgentOps Lead | Neue Validierungstests ergänzt (Link-Hint-Scraping, erweiterte Alias-Normalisierung); vollständige Suite weiterhin grün | längere Testdauer | kleine Fixtures, schneller Gesamtlauf (~3s) |
+
+Integration Review:
+- Migros/Coop/Aldi/Lidl profitieren jetzt zusätzlich von link-basiertem Fallback neben Selector/JSON-Pfaden.
+- Ingredient-Harmonisierung liefert konsistentere Canonicals und reduziert retail-spezifisches Labelrauschen weiter.
+- Menü-Matching nutzt Taxonomie robuster (Keyword-Normalisierung via normalizer), bleibt leichtgewichtig (SSR/SQLite, keine neuen Pakete).
+
