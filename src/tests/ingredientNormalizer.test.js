@@ -112,3 +112,13 @@ test('harmonizeRetailerIngredientMap builds cross-retailer canonical view', () =
   assert.equal(mapped.Rindfleisch.mentions, 2);
   assert.equal(mapped.Lachs.taxonomy, 'proteins');
 });
+
+test('normalizeIngredient removes retailer brand labels and keeps canonical food item', () => {
+  const a = normalizeIngredient('M-Classic Poulet Filetstreifen 2x200g');
+  const b = normalizeIngredient('Naturaplan Cherrytomaten 500g');
+  const c = normalizeIngredient('Milbona Skyr Nature 450g');
+
+  assert.equal(a?.canonical, 'Pouletbrust');
+  assert.equal(b?.canonical, 'Tomaten');
+  assert.equal(c?.canonical, 'Skyr');
+});

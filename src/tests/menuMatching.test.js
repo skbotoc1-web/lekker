@@ -98,3 +98,16 @@ test('menu planner normalizes raw offer labels before scoring dishes', () => {
   const menu = createDailyMenu(day);
   assert.equal(menu.omni_lunch, 'Rindstreifen mit Vollkornreis');
 });
+
+test('menu planner maps retailer-style fish labels to canonical dish matching', () => {
+  const day = '2026-03-20';
+
+  db.prepare('DELETE FROM clustered_offers WHERE day = ?').run(day);
+  const insert = db.prepare('INSERT INTO clustered_offers (day, category, vegan, item, source_retailer) VALUES (?, ?, ?, ?, ?)');
+  insert.run(day, 'abendessen', 0, 'Thunfischchunks 2x160g', 'lidl');
+  insert.run(day, 'abendessen', 0, 'Tomaten', 'migros');
+  insert.run(day, 'abendessen', 0, 'Vollkornpasta', 'coop');
+
+  const menu = createDailyMenu(day);
+  assert.equal(menu.omni_dinner, 'Protein-Pasta mit Thunfisch');
+});

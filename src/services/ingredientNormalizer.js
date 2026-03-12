@@ -6,7 +6,7 @@ const STOPWORDS = [
 ];
 
 const RETAILER_NOISE = /\b(migros|coop|aldi|lidl|supermarkt|marktfrisch|aktionen)\b/i;
-const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service|lieferung|abholung)\b/i;
+const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service|lieferung|abholung|pfanne|messer|reiniger|waschmittel)\b/i;
 
 const KNOWN_INGREDIENTS = [
   { re: /\bhafer[-\s]?(fl|)ocken?\b/i, canonical: 'Haferflocken', veganLikely: true, categoryHint: 'fruehstueck' },
@@ -89,7 +89,20 @@ const TOKEN_SYNONYMS = new Map([
   ['huhnfilet', 'pouletbrust'],
   ['cherrytomaten', 'tomaten'],
   ['blattspinat', 'spinat'],
-  ['veggiehack', 'linsen']
+  ['veggiehack', 'linsen'],
+  ['bioaldisuisse', 'bio'],
+  ['naturaplan', 'bio'],
+  ['prixgarantie', 'natur'],
+  ['mbudget', 'natur'],
+  ['chefselect', 'natur'],
+  ['milbona', 'natur'],
+  ['deluxe', 'natur'],
+  ['filets', 'filet'],
+  ['filetstreifen', 'pouletbrust'],
+  ['gemuesemix', 'gemuese'],
+  ['gemusemix', 'gemuese'],
+  ['lachsportionen', 'lachs'],
+  ['thunfischchunks', 'thunfisch']
 ]);
 
 export const INGREDIENT_TAXONOMY = {
@@ -115,13 +128,15 @@ function sanitizeRaw(input) {
 
 function removeUnits(input) {
   return input
-    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose|glas|schale|becher|tranche|scheiben?)\b/g, ' ')
+    .replace(/[¼½¾]/g, ' ')
+    .replace(/\b\d+(?:[.,]\d+)?\s*(kg|g|mg|ml|l|cl|dl|stk|stuck|stück|pack|beutel|x|portion(?:en)?|bund|kopf|dose|glas|schale|becher|tranche|scheiben?|tab(?:s|letten)?|caps?|kapseln?)\b/g, ' ')
     .replace(/\b\d+\s*[x×]\s*\d+(?:[.,]\d+)?\b/g, ' ')
     .replace(/\b\d+er\b/g, ' ')
-    .replace(/\b(ca\.?|ab|nur|statt|pro|per|je|nur heute|solange vorrat)\b/g, ' ')
-    .replace(/\b(chf|fr\.?|preis|statt\s*chf\s*\d+(?:[.,]\d+)?)\b/g, ' ')
-    .replace(/\b(kaliber|klasse|gr\.?|gross|klein|mittel|aktion|sonderpreis|promo|wochenhit)\b/g, ' ')
-    .replace(/\b\d{1,3}%\b/g, ' ');
+    .replace(/\b(ca\.?|ab|nur|statt|pro|per|je|nur heute|solange vorrat|guenstiger|günstiger|ab 2 st\.?|aktion gilt)\b/g, ' ')
+    .replace(/\b(chf|fr\.?|preis|statt\s*chf\s*\d+(?:[.,]\d+)?|nur\s*\d+(?:[.,]\d+)?)\b/g, ' ')
+    .replace(/\b(kaliber|klasse|gr\.?|gross|klein|mittel|aktion|sonderpreis|promo|wochenhit|hit|deal)\b/g, ' ')
+    .replace(/\b\d{1,3}%\b/g, ' ')
+    .replace(/\b(naturaplan|m-?classic|m-?budget|prix\s*garantie|chef\s*select|milbona|deluxe)\b/g, ' ');
 }
 
 function cleanCandidate(original) {

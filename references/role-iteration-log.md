@@ -172,3 +172,19 @@ Integration Review:
 - Ingredient-Normalisierung/Harmonisierung liefert konsistentere Canonicals auch in cross-retailer Sicht.
 - Menüauswahl passt besser zu realen Offer-Labels (z.B. „Rinds Hack 2 x 500g“ → Rindstreifen-Gericht), Architektur bleibt leichtgewichtig (SSR + SQLite).
 
+## Iteration 12
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Overnight-Fokus strikt auf Händlerdatenqualität, Mapping-Harmonisierung und Matching-Treffer gehalten; bestehende SEO/UX-Flächen bewusst stabil | Scope-Verlust durch Nebenfeatures | Genau ein integrierter Verbesserungsloop, keine neue Produktfläche |
+| CTO | Retailer-Extraktion je Händler vertieft (zusätzliche Selektoren), dedup/scoring geschärft, taxonomy-aware Auswahl mit Hybrid-Fallback verbessert | Heuristik drift bei Website-Änderungen | Multi-Source-Kette + konservative Thresholds + Fallback-Fill behalten |
+| CFO | Lightweight-Guardrail eingehalten: 0 neue Runtime-Abhängigkeiten, nur modulare Service-/Test-Änderungen | Heuristik-Komplexität steigt | Kleine pure Helpers + testbare Contracts als Wartungsschutz |
+| Designer | Bestehende Intent-/Cluster-/Index-/Print-UX unverändert schlank gehalten, interne Linkhubs weiter nutzbar | wenig sichtbare UI-Neuheit | bewusst Datenqualität vor UI-Ausbau |
+| Nutrition Lead | Normalisierung erweitert (Retail-Brand-Noise, Unit/Promo-Cleanup, zusätzliche Synonyme), Canonical-Harmonisierung für Cross-Retailer robuster | Fehlklassifikation bei Randbegriffen | bekannte Canonicals priorisieren, Soft-Fallback konservativ |
+| AgentOps Lead | Validierungstests ausgebaut: Brand-Noise-Normalisierung + retailer-style Fish-Label-Matching als Regression-Schutz | Testlaufzeit | kleine Fixtures, Suite bleibt schnell |
+
+Integration Review:
+- Vier Retailer-Pfade (Migros/Coop/Aldi/Lidl) extrahieren stabiler durch breitere Selektorabdeckung und robustere Auswahlstrategie.
+- Ingredient-Harmonisierung liefert konsistentere Canonicals trotz Retail-Label/Unit/Promo-Rauschen.
+- Ingredient-to-menu Matching trifft Angebotslage besser (z.B. „Thunfischchunks“ → passende Dinner-Auswahl) bei unverändert leichtgewichtigem Stack.
+

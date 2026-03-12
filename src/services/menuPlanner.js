@@ -71,6 +71,14 @@ function norm(value) {
   return canonicalToken(fold(value).replace(/[^a-z]/g, ''));
 }
 
+function extractDishNameSignals(name = '') {
+  return String(name)
+    .split(/[^\p{L}\p{N}]+/u)
+    .map(x => normalizeIngredient(x)?.canonical)
+    .filter(Boolean)
+    .map(x => norm(x));
+}
+
 function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, slot, optionType) {
   let matchedKeywords = 0;
 
@@ -107,7 +115,11 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retaile
 
   const slotBoost = slotSignals.get(`${slot}:${optionType}`) || 0;
   const neutralSlotBoost = slotSignals.get(`${slot}:any`) || 0;
-  return keywordScore + coverageBoost + weakCoveragePenalty + (slotBoost * 0.9) + (neutralSlotBoost * 0.35);
+
+  const dishNameSignals = extractDishNameSignals(dish.name);
+  const dishNameScore = dishNameSignals.reduce((acc, sig) => acc + Math.min(1.2, (offerIndex.get(sig) || 0) * 0.55), 0);
+
+  return keywordScore + coverageBoost + weakCoveragePenalty + (slotBoost * 0.9) + (neutralSlotBoost * 0.35) + dishNameScore;
 }
 
 function buildOfferIndex(day) {

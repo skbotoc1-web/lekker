@@ -10,7 +10,8 @@ const retailers = [
       '[data-testid*="product"] h2', '[data-testid*="product"] h3', '[data-testid*="offer"] h2',
       '[class*="product"] [class*="title"]', '[class*="offer"] [class*="title"]', '[class*="m-product"] [title]',
       '[class*="product"] [data-product-name]', '[class*="tile"] [aria-label]', '[class*="tile"] [data-title]',
-      '[data-testid*="product"] [aria-label]', 'article h2', 'article h3',
+      '[data-testid*="product"] [aria-label]', '[data-testid*="offer"] [aria-label]', '[class*="product-card"] [data-testid*="title"]',
+      'article h2', 'article h3', 'a[href*="/produkt/"] [aria-label]',
       'a[title*="Bio"]', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]', 'img[alt]', 'button[aria-label]'
     ]
   },
@@ -21,8 +22,8 @@ const retailers = [
     selectors: [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="tile"] [class*="headline"]',
       '[class*="teaser"] [class*="title"]', '[data-qa*="product"] [title]', '[data-qa*="product"] [aria-label]',
-      '[class*="offer"] [data-name]', '[class*="article"] [title]', '[class*="product"] [data-name]',
-      'article h2', 'article h3', 'a[title]', '[data-product-name]', '[data-name]', '[data-title]', 'img[alt]', 'button[aria-label]'
+      '[class*="offer"] [data-name]', '[class*="article"] [title]', '[class*="product"] [data-name]', '[data-qa*="product"] [data-name]',
+      'article h2', 'article h3', 'a[title]', 'a[href*="/produkte/"] [title]', '[data-product-name]', '[data-name]', '[data-title]', 'img[alt]', 'button[aria-label]'
     ]
   },
   {
@@ -32,8 +33,8 @@ const retailers = [
     selectors: [
       '[class*="offer"] h2', '[class*="offer"] h3', '[class*="product"] h2', '[class*="product"] h3',
       '[class*="teaser"] [class*="title"]', '[class*="mod-offer"] [title]', '[class*="mod-offer"] [aria-label]',
-      '[class*="mod-offer"] [data-title]', '[class*="product"] [data-name]', '[data-title]',
-      '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]', 'img[alt]', 'button[aria-label]'
+      '[class*="mod-offer"] [data-title]', '[class*="product"] [data-name]', '[data-title]', '[data-testid*="product"] [title]',
+      '[data-product-name]', '[data-name]', 'article h2', 'article h3', 'a[title]', 'a[href*="/angebote/"] [aria-label]', 'img[alt]', 'button[aria-label]'
     ]
   },
   {
@@ -43,8 +44,8 @@ const retailers = [
     selectors: [
       '[class*="product"] h2', '[class*="product"] h3', '[class*="offer"] h2', '[class*="offer"] h3',
       '[class*="tile"] [class*="title"]', '[class*="product-grid"] [title]', '[class*="product-grid"] [aria-label]',
-      '[class*="product-grid"] [data-title]', '[class*="product"] [data-name]',
-      '[data-product-name]', '[data-name]', '[data-title]', 'article h2', 'article h3', 'a[title]', 'img[alt]', 'button[aria-label]'
+      '[class*="product-grid"] [data-title]', '[class*="product"] [data-name]', '[data-testid*="product"] [aria-label]',
+      '[data-product-name]', '[data-name]', '[data-title]', 'article h2', 'article h3', 'a[title]', 'a[href*="/p/"] [title]', 'img[alt]', 'button[aria-label]'
     ]
   }
 ];
@@ -57,7 +58,7 @@ const fallbackItems = {
 };
 
 const genericFallback = ['Tomaten', 'Kartoffeln', 'Gurken', 'Karotten', 'Reis', 'Quinoa', 'Kichererbsen', 'Linsen', 'Brokkoli', 'Bananen'];
-const HEADING_NOISE = /\b(angebote|aktionen|shop|prospekt|newsletter|kundenkonto|entdecken|inspiration|menue|menu|rezepte)\b/i;
+const HEADING_NOISE = /\b(angebote|aktionen|shop|prospekt|newsletter|kundenkonto|entdecken|inspiration|menue|menu|rezepte|mehr anzeigen|alle anzeigen|zur kategorie|sale)\b/i;
 
 function tryParseJson(raw) {
   try { return JSON.parse(raw); } catch { return null; }
@@ -212,11 +213,25 @@ function fallbackFor(retailerId) {
 function finalizeSelection(harmonized, retailerId) {
   const selected = [];
   const seen = new Set();
+  const taxonomySeen = new Set();
 
   const strict = harmonized.filter(row => row.maxConfidence >= 0.58 || row.mentions >= 2);
-  const relaxed = harmonized.filter(row => row.maxConfidence >= 0.54 || row.mentions >= 1);
+  const relaxed = harmonized.filter(row => row.maxConfidence >= 0.52 || row.mentions >= 1);
 
-  for (const row of [...strict, ...relaxed]) {
+  const ranked = [...strict, ...relaxed];
+
+  for (const row of ranked) {
+    const item = row.canonical;
+    if (seen.has(item)) continue;
+    const taxonomy = row.taxonomy || 'other';
+    if (selected.length < 6 && taxonomySeen.has(taxonomy)) continue;
+    seen.add(item);
+    taxonomySeen.add(taxonomy);
+    selected.push({ item, price: 'n/a', mentions: row.mentions, confidence: row.maxConfidence, source: 'parsed' });
+    if (selected.length >= 10) break;
+  }
+
+  for (const row of ranked) {
     const item = row.canonical;
     if (seen.has(item)) continue;
     seen.add(item);
