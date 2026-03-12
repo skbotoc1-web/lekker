@@ -3,8 +3,14 @@ import { config } from './core/config.js';
 import { log } from './core/logger.js';
 import { scheduleAgents, runFullPipelineOnce } from './agents/orchestrator.js';
 import { createServer } from './web/server.js';
+import { repairLegacyRecipeSets } from './services/recipeService.js';
 
 migrate();
+
+if (process.env.REPAIR_RECIPES_ON_BOOT !== 'false') {
+  const report = repairLegacyRecipeSets();
+  log.info('recipe_repair_boot', report);
+}
 
 const app = createServer();
 app.listen(config.app.port, () => {

@@ -797,6 +797,56 @@ function buildBySlot(slot, vegan, title) {
   return buildDrinkRecipe({ title, meta });
 }
 
+const EXPECTED_RECIPES_PER_MENU = 10;
+
+function parseJsonSafe(raw, fallback) {
+  try {
+    return JSON.parse(raw || JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+}
+
+function shouldRepairMenuRecipes(menu) {
+  const rows = db.prepare('SELECT option_type, meal_slot, title, ingredients, steps, meta FROM recipes WHERE menu_id=? ORDER BY option_type, meal_slot').all(menu.id);
+
+  if (rows.length !== EXPECTED_RECIPES_PER_MENU) return true;
+
+  for (const row of rows) {
+    const vegan = row.option_type === 'vegan';
+    const protein = inferProteinProfile(row.title, vegan, row.meal_slot);
+    const ingredients = parseJsonSafe(row.ingredients, []);
+    const steps = parseJsonSafe(row.steps, []);
+    const meta = parseJsonSafe(row.meta, {});
+
+    if (meta?.titleMarketing && meta.titleMarketing !== row.title) {
+      return true;
+    }
+
+    try {
+      validateRecipeConsistency({ title: row.title, ingredients, steps, meta }, { slot: row.meal_slot, vegan, protein });
+    } catch {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export function repairLegacyRecipeSets() {
+  const menus = db.prepare('SELECT * FROM menus ORDER BY day DESC').all();
+  const regenerate = db.transaction((menu) => generateRecipesForMenu(menu));
+
+  let repaired = 0;
+  for (const menu of menus) {
+    if (!shouldRepairMenuRecipes(menu)) continue;
+    regenerate(menu);
+    repaired += 1;
+  }
+
+  return { scanned: menus.length, repaired };
+}
+
 export function generateRecipesForMenu(menu) {
   db.prepare('DELETE FROM recipes WHERE menu_id = ?').run(menu.id);
 

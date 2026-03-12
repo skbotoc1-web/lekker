@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate, db } from '../core/db.js';
-import { generateRecipesForMenu } from '../services/recipeService.js';
+import { generateRecipesForMenu, repairLegacyRecipeSets } from '../services/recipeService.js';
 
 migrate();
 
@@ -126,4 +126,23 @@ test('protein-porridge uses cooking flow and not raw bowl-only wording', () => {
   const stepsText = breakfast.steps.join(' ').toLowerCase();
   assert.equal(stepsText.includes('köcheln') || stepsText.includes('koecheln') || stepsText.includes('kochen'), true);
   assert.equal(/hafer/.test(breakfast.text), true);
+});
+
+test('boot repair regenerates legacy recipe sets with inconsistent titleMarketing', () => {
+  resetData();
+  const menu = insertMenu('2099-12-30', { omni_lunch: 'Poulet-Quinoa-Salat' });
+
+  db.prepare('INSERT INTO recipes (menu_id, option_type, meal_slot, title, ingredients, steps, meta) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(menu.id, 'omni', 'mittagessen', 'Poulet-Quinoa-Salat', JSON.stringify(['120 g Pouletbrust']), JSON.stringify(['Poulet anbraten.']), JSON.stringify({ titleMarketing: 'Quinoa-Garten mit Zitronen-Poulet', subtitle: 'Rindstreifen mit Vollkornreis' }));
+
+  const report = repairLegacyRecipeSets();
+  assert.equal(report.repaired, 1);
+
+  const repairedRows = db.prepare('SELECT title, meta FROM recipes WHERE menu_id=?').all(menu.id);
+  assert.equal(repairedRows.length, 10);
+
+  for (const row of repairedRows) {
+    const meta = JSON.parse(row.meta || '{}');
+    assert.equal(meta.titleMarketing, row.title);
+  }
 });
