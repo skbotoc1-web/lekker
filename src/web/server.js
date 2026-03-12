@@ -42,13 +42,17 @@ function htmlLayout({ title, description, canonical, body, jsonLd }) {
 }
 
 function recipeCta(day, lookup, option, slot) {
-  if (!lookup.has(`${option}:${slot}`)) {
+  const key = `${option}:${slot}`;
+  const match = lookup.get(key);
+  if (!match) {
     return `<span class="recipe-pending" aria-label="Rezept folgt">Rezept folgt</span>`;
   }
-  return `<a class="recipe-link" href="/rezept/${option}/${day}/${slot}">Rezept</a>`;
+
+  const label = option === 'vegan' ? 'Veganes Rezept' : 'Nicht-veganes Rezept';
+  return `<a class="recipe-link" data-variant="${option}" href="/rezept/${option}/${day}/${slot}?rid=${match.id}">${label}</a>`;
 }
 
-function menuCards(menu, recipeLookup = new Set()) {
+function menuCards(menu, recipeLookup = new Map()) {
   const recipeCount = recipeLookup.size;
   const isComplete = recipeCount >= EXPECTED_RECIPE_COUNT;
 
@@ -129,13 +133,14 @@ function dayRotationIndex(seed, max) {
 }
 
 function getTodayRecommendations(day) {
-  const rows = db.prepare('SELECT r.title, r.meta, r.option_type, r.meal_slot, m.day FROM recipes r JOIN menus m ON m.id = r.menu_id ORDER BY r.id DESC LIMIT 24').all();
+  const rows = db.prepare('SELECT r.id, r.title, r.meta, r.option_type, r.meal_slot, m.day FROM recipes r JOIN menus m ON m.id = r.menu_id ORDER BY r.id DESC LIMIT 24').all();
   if (!rows.length) return [];
   const start = dayRotationIndex(day, rows.length);
   const rotated = [...rows.slice(start), ...rows.slice(0, start)];
   return rotated.slice(0, 3).map(r => {
     const meta = JSON.parse(r.meta || '{}');
     return {
+      id: r.id,
       title: meta.titleMarketing || r.title,
       option: r.option_type,
       slot: r.meal_slot,
@@ -400,10 +405,10 @@ export function createServer() {
   });
 
   app.get('/rezepte', (_, res) => {
-    const rows = db.prepare('SELECT r.option_type,r.meal_slot,r.title,r.meta,m.day FROM recipes r JOIN menus m ON m.id=r.menu_id ORDER BY m.day DESC LIMIT 30').all();
+    const rows = db.prepare('SELECT r.id,r.option_type,r.meal_slot,r.title,r.meta,m.day FROM recipes r JOIN menus m ON m.id=r.menu_id ORDER BY m.day DESC LIMIT 30').all();
     const cards = rows.map(r => {
       const meta = JSON.parse(r.meta || '{}');
-      return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}'>Zum Rezept</a></article>`;
+      return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}?rid=${r.id}'>Zum Rezept</a></article>`;
     }).join('');
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -416,7 +421,7 @@ export function createServer() {
 
   app.get('/kategorie/:slug', (req, res) => {
     const { slug } = req.params;
-    const rows = db.prepare('SELECT r.option_type,r.meal_slot,r.title,r.meta,m.day FROM recipes r JOIN menus m ON m.id=r.menu_id ORDER BY m.day DESC LIMIT 60').all();
+    const rows = db.prepare('SELECT r.id,r.option_type,r.meal_slot,r.title,r.meta,m.day FROM recipes r JOIN menus m ON m.id=r.menu_id ORDER BY m.day DESC LIMIT 60').all();
     const filters = {
       schnell: r => (JSON.parse(r.meta || '{}').timeMin || 999) <= 30,
       'low-carb': r => /salat|bowl|gemüse|fisch|poulet/i.test(JSON.parse(r.meta || '{}').titleMarketing || r.title),
@@ -430,7 +435,7 @@ export function createServer() {
     const selected = rows.filter(filter).slice(0, 24);
     const cards = selected.map(r => {
       const meta = JSON.parse(r.meta || '{}');
-      return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}'>Zum Rezept</a></article>`;
+      return `<article class='card recipe-index-card'><p class='eyebrow'>${r.option_type} · ${slotLabel(r.meal_slot)} · ${r.day}</p><h3>${meta.titleMarketing || r.title}</h3><p class='meta-inline'>${meta.timeMin || '-'} Min · ${difficultyLabel(meta.difficulty || 1)} · ${meta.kcal || '-'} kcal · ${meta.proteinHint || 'Protein: n/a'} · CO₂ ${meta.co2Label || '-'}</p><a class='recipe-link' href='/rezept/${r.option_type}/${r.day}/${r.meal_slot}?rid=${r.id}'>Zum Rezept</a></article>`;
     }).join('');
 
     res.send(htmlLayout({
@@ -511,7 +516,19 @@ export function createServer() {
       }));
     }
 
-    const recipeRaw = db.prepare('SELECT * FROM recipes WHERE menu_id=? AND option_type=? AND meal_slot=?').get(menu.id, option, slot);
+    const recipeId = Number(req.query.rid);
+    let recipeRaw = Number.isInteger(recipeId) && recipeId > 0
+      ? db.prepare('SELECT * FROM recipes WHERE id=? AND menu_id=?').get(recipeId, menu.id)
+      : null;
+
+    if (recipeRaw && (recipeRaw.option_type !== option || recipeRaw.meal_slot !== slot)) {
+      return res.redirect(302, `/rezept/${recipeRaw.option_type}/${day}/${recipeRaw.meal_slot}?rid=${recipeRaw.id}`);
+    }
+
+    if (!recipeRaw) {
+      recipeRaw = db.prepare('SELECT * FROM recipes WHERE menu_id=? AND option_type=? AND meal_slot=?').get(menu.id, option, slot);
+    }
+
     if (!recipeRaw) {
       return res.status(404).send(htmlLayout({
         title: 'Rezept noch nicht verfügbar | lekker',
@@ -624,7 +641,7 @@ export function createServer() {
           : `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`;
 
     const recommended = getTodayRecommendations(menu.day);
-    const recCards = recommended.map(r => `<article class='card recipe-index-card'><p class='eyebrow'>heute empfohlen · ${slotLabel(r.slot)}</p><h3>${r.title}</h3><p class='meta-inline'>${r.timeMin} Min · ${r.kcal} kcal · ${r.proteinHint} · CO₂ ${r.co2Label}</p><a class='recipe-link' href='/rezept/${r.option}/${r.day}/${r.slot}'>Zum Rezept</a></article>`).join('');
+    const recCards = recommended.map(r => `<article class='card recipe-index-card'><p class='eyebrow'>heute empfohlen · ${r.option === 'vegan' ? 'vegan' : 'nicht-vegan'} · ${slotLabel(r.slot)}</p><h3>${r.title}</h3><p class='meta-inline'>${r.timeMin} Min · ${r.kcal} kcal · ${r.proteinHint} · CO₂ ${r.co2Label}</p><a class='recipe-link' href='/rezept/${r.option}/${r.day}/${r.slot}?rid=${r.id}'>Zum Rezept</a></article>`).join('');
     const faq = [
       ['Was koche ich heute?', 'Nutze das Tagesmenü mit vollständigen Rezepten und direkter Einkaufsliste.'],
       ['Was, wenn es schnell gehen muss?', 'Filtere in den Kategorien nach schnell und fokussiere auf Rezepte unter 30 Minuten.']

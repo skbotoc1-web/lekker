@@ -28,8 +28,12 @@ export function getRecipeCount(menuId) {
 }
 
 export function getRecipeLookup(menuId) {
-  const rows = db.prepare('SELECT option_type, meal_slot FROM recipes WHERE menu_id=?').all(menuId);
-  return new Set(rows.map(r => key(r.option_type, r.meal_slot)));
+  const rows = db.prepare('SELECT id, option_type, meal_slot FROM recipes WHERE menu_id=?').all(menuId);
+  return new Map(rows.map(r => [key(r.option_type, r.meal_slot), {
+    id: r.id,
+    option_type: r.option_type,
+    meal_slot: r.meal_slot
+  }]));
 }
 
 export function assertCompleteSet(recipes) {

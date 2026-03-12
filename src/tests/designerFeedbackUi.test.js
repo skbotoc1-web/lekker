@@ -69,6 +69,37 @@ test('recipe detail for missing recipe renders recovery error card', async () =>
   });
 });
 
+test('menu links separate vegan/non-vegan recipe targets with distinct ids', async () => {
+  resetData();
+  const day = '2099-12-23';
+  const menuId = insertMenu(day, 'draft');
+
+  const stmt = db.prepare('INSERT INTO recipes (menu_id, option_type, meal_slot, title, ingredients, steps, meta) VALUES (?, ?, ?, ?, ?, ?, ?)');
+  stmt.run(menuId, 'vegan', 'fruehstueck', 'Tofu-Rührei mit Vollkorntoast', '[]', '[]', JSON.stringify({ titleMarketing: 'Veganes Frühstück' }));
+  stmt.run(menuId, 'omni', 'fruehstueck', 'Eiermuffins mit Spinat', '[]', '[]', JSON.stringify({ titleMarketing: 'Nicht-veganes Frühstück' }));
+
+  await withServer(async (baseUrl) => {
+    const menuRes = await fetch(`${baseUrl}/menue/${day}`);
+    const html = await menuRes.text();
+
+    const veganHref = html.match(new RegExp(`/rezept/vegan/${day}/fruehstueck\\?rid=\\d+`))?.[0];
+    const omniHref = html.match(new RegExp(`/rezept/omni/${day}/fruehstueck\\?rid=\\d+`))?.[0];
+
+    assert.equal(menuRes.status, 200);
+    assert.ok(veganHref);
+    assert.ok(omniHref);
+    assert.notEqual(veganHref, omniHref);
+    assert.equal(html.includes('Veganes Rezept'), true);
+    assert.equal(html.includes('Nicht-veganes Rezept'), true);
+
+    const veganPage = await (await fetch(`${baseUrl}${veganHref}`)).text();
+    const omniPage = await (await fetch(`${baseUrl}${omniHref}`)).text();
+
+    assert.equal(veganPage.includes('Vegan · Frühstück'), true);
+    assert.equal(omniPage.includes('Nicht-vegan · Frühstück'), true);
+  });
+});
+
 test('layout exposes skip-link for keyboard navigation', async () => {
   resetData();
   insertMenu('2099-12-22', 'published');
