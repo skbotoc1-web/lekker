@@ -1,0 +1,102 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { migrate, db } from '../core/db.js';
+import { generateRecipesForMenu } from '../services/recipeService.js';
+
+migrate();
+
+function resetData() {
+  db.prepare('DELETE FROM approvals').run();
+  db.prepare('DELETE FROM recipes').run();
+  db.prepare('DELETE FROM menus').run();
+}
+
+function insertMenu(day, overrides = {}) {
+  const payload = {
+    vegan_breakfast: 'Tofu-Rührei mit Vollkorntoast',
+    vegan_lunch: 'Linsen-Bowl mit Quinoa und Ofengemüse',
+    vegan_dinner: 'Süsskartoffel-Tofu-Blech',
+    vegan_snack: 'Hummus mit Gemüsesticks',
+    vegan_drink: 'Infused Water Zitrone-Minze',
+    omni_breakfast: 'Skyr-Bowl mit Hafer und Früchten',
+    omni_lunch: 'Poulet-Quinoa-Salat',
+    omni_dinner: 'Forelle mit Ofengemüse',
+    omni_snack: 'Skyr mit Nüssen',
+    omni_drink: 'Wasser mit Limette',
+    ...overrides
+  };
+
+  db.prepare(`
+    INSERT INTO menus (
+      day, vegan_breakfast, vegan_lunch, vegan_dinner, vegan_snack, vegan_drink,
+      omni_breakfast, omni_lunch, omni_dinner, omni_snack, omni_drink, co2_score, status, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 2.0, 'draft', ?)
+  `).run(
+    day,
+    payload.vegan_breakfast,
+    payload.vegan_lunch,
+    payload.vegan_dinner,
+    payload.vegan_snack,
+    payload.vegan_drink,
+    payload.omni_breakfast,
+    payload.omni_lunch,
+    payload.omni_dinner,
+    payload.omni_snack,
+    payload.omni_drink,
+    new Date().toISOString()
+  );
+
+  return db.prepare('SELECT * FROM menus WHERE day=?').get(day);
+}
+
+function flattenRecipe(recipe) {
+  const meta = JSON.parse(recipe.meta || '{}');
+  const ingredients = JSON.parse(recipe.ingredients || '[]');
+  const steps = JSON.parse(recipe.steps || '[]');
+  return {
+    ...recipe,
+    meta,
+    ingredients,
+    steps,
+    text: `${recipe.title} ${meta.titleMarketing || ''} ${meta.subtitle || ''} ${ingredients.join(' ')} ${steps.join(' ')}`.toLowerCase()
+  };
+}
+
+test('omni dinner with poulet title stays poulet-consistent and excludes fish proteins', () => {
+  resetData();
+  const menu = insertMenu('2099-12-25', { omni_dinner: 'Pouletpfanne mit Bohnen' });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const dinner = rows.find(r => r.option_type === 'omni' && r.meal_slot === 'abendessen');
+
+  assert.ok(dinner);
+  assert.equal(dinner.meta.titleMarketing, 'Pouletpfanne mit Bohnen');
+  assert.equal(/poulet|huhn/.test(dinner.text), true);
+  assert.equal(/forelle|lachs|thunfisch/.test(dinner.text), false);
+});
+
+test('omni dinner with forelle title stays fish-consistent and excludes poultry proteins', () => {
+  resetData();
+  const menu = insertMenu('2099-12-26', { omni_dinner: 'Forelle mit Ofengemüse' });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const dinner = rows.find(r => r.option_type === 'omni' && r.meal_slot === 'abendessen');
+
+  assert.ok(dinner);
+  assert.equal(dinner.meta.titleMarketing, 'Forelle mit Ofengemüse');
+  assert.equal(/forelle|fisch/.test(dinner.text), true);
+  assert.equal(/poulet|huhn|rind/.test(dinner.text), false);
+});
+
+test('omni lunch with lachs title uses lachs and excludes poulet', () => {
+  resetData();
+  const menu = insertMenu('2099-12-27', { omni_lunch: 'Lachs mit Kartoffeln und Gemüse' });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const lunch = rows.find(r => r.option_type === 'omni' && r.meal_slot === 'mittagessen');
+
+  assert.ok(lunch);
+  assert.equal(lunch.meta.titleMarketing, 'Lachs mit Kartoffeln und Gemüse');
+  assert.equal(/lachs|fisch/.test(lunch.text), true);
+  assert.equal(/poulet|huhn/.test(lunch.text), false);
+});
