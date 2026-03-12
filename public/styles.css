@@ -47,6 +47,23 @@ button:focus-visible,
   border-radius: 8px;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0.5rem;
+  z-index: 100;
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  background: #0d1b2a;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  left: 0.6rem;
+}
+
 .topbar {
   position: sticky;
   top: 0;
@@ -289,8 +306,14 @@ h2 {
   margin-bottom: 0.55rem;
 }
 
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 table {
   width: 100%;
+  min-width: 520px;
   border-collapse: collapse;
   font-size: 0.94rem;
 }

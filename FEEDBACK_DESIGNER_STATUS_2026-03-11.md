@@ -32,11 +32,18 @@
 - Auf kleinen Screens werden Menüeinträge besser gestapelt.
 - CTA-Pills sind touch-freundlicher gestaltet.
 
+## 6) Accessibility-Basics (zusätzlicher Feinschliff)
+**Status:** ✅ erledigt
+- Skip-Link für Keyboard-Navigation ergänzt (`Zum Inhalt springen`).
+- Main-Landmark mit Fokusziel (`id="main-content"`, `tabindex="-1"`).
+- Horizontales Scroll-Handling für Status-Tabellen auf kleinen Screens (`.table-wrap`).
+
 ---
 
 ## QA Verifikation
-- Test-Suite: **26/26 grün** (`npm test`)
-- Manuelle Smoke-Checks bestätigt:
+- Test-Suite: **62/62 grün** (`npm test`)
+- Zusätzliche UI-Verifikation:
   - Draft-Hinweis sichtbar
   - „Rezept folgt“ statt Dead-Link
   - Recovery-Links vorhanden
+  - Skip-Link im Layout vorhanden
