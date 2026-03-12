@@ -100,3 +100,30 @@ test('omni lunch with lachs title uses lachs and excludes poulet', () => {
   assert.equal(/lachs|fisch/.test(lunch.text), true);
   assert.equal(/poulet|huhn/.test(lunch.text), false);
 });
+
+test('pouletpfanne enforces pan-technique and avoids oven wording', () => {
+  resetData();
+  const menu = insertMenu('2099-12-28', { omni_dinner: 'Pouletpfanne mit Bohnen' });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const dinner = rows.find(r => r.option_type === 'omni' && r.meal_slot === 'abendessen');
+
+  assert.ok(dinner);
+  const stepsText = dinner.steps.join(' ').toLowerCase();
+  assert.equal(stepsText.includes('pfanne'), true);
+  assert.equal(stepsText.includes('backofen'), false);
+  assert.equal(stepsText.includes('im ofen'), false);
+});
+
+test('protein-porridge uses cooking flow and not raw bowl-only wording', () => {
+  resetData();
+  const menu = insertMenu('2099-12-29', { vegan_breakfast: 'Protein-Porridge mit Beeren' });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const breakfast = rows.find(r => r.option_type === 'vegan' && r.meal_slot === 'fruehstueck');
+
+  assert.ok(breakfast);
+  const stepsText = breakfast.steps.join(' ').toLowerCase();
+  assert.equal(stepsText.includes('köcheln') || stepsText.includes('koecheln') || stepsText.includes('kochen'), true);
+  assert.equal(/hafer/.test(breakfast.text), true);
+});

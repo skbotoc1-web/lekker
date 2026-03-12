@@ -189,33 +189,47 @@ function inferBaseComponent(title, slot) {
   if (slot === 'drink') return null;
   if (slot === 'snack') return null;
 
-  if (hasWord(text, 'pasta|nudeln?|spaghetti|penne')) {
+  if (slot === 'fruehstueck' && hasStem(text, 'porridge')) {
+    return {
+      ingredient: '55 g Haferflocken',
+      prep: 'Haferflocken mit 180 ml Flüssigkeit 4–5 Minuten sanft köcheln lassen.'
+    };
+  }
+
+  if (hasStem(text, 'pasta|nudeln?|spaghetti|penne')) {
     return {
       ingredient: '80 g Vollkornpasta (trocken)',
       prep: 'Vollkornpasta nach Packung al dente kochen.'
     };
   }
 
-  if (hasWord(text, 'reis|risotto')) {
+  if (hasStem(text, 'reis|risotto')) {
     return {
       ingredient: '70 g Vollkornreis (trocken)',
       prep: 'Reis waschen und in leicht gesalzenem Wasser garen.'
     };
   }
 
-  if (hasWord(text, 'kartoffel')) {
+  if (hasStem(text, 'kartoffel')) {
     return {
       ingredient: '250 g Kartoffeln',
       prep: slot === 'abendessen'
-        ? 'Kartoffeln in Spalten schneiden und ofengaren.'
+        ? 'Kartoffeln in Spalten schneiden und im Ofen garen.'
         : 'Kartoffeln in wenig Salzwasser garen.'
     };
   }
 
-  if (hasWord(text, 'quinoa')) {
+  if (hasStem(text, 'quinoa')) {
     return {
       ingredient: '60 g Quinoa (trocken)',
       prep: 'Quinoa gründlich waschen und 12–15 Minuten garen.'
+    };
+  }
+
+  if (slot === 'abendessen' && hasStem(text, 'pfanne|stir[-\s]?fry')) {
+    return {
+      ingredient: '70 g Vollkornreis (trocken)',
+      prep: 'Vollkornreis vorkochen und abtropfen lassen.'
     };
   }
 
@@ -235,7 +249,7 @@ function inferBaseComponent(title, slot) {
 
   return {
     ingredient: '250 g Kartoffeln',
-    prep: 'Kartoffeln in Spalten schneiden und ofengaren.'
+    prep: 'Kartoffeln in Spalten schneiden und im Ofen garen.'
   };
 }
 
@@ -246,12 +260,12 @@ function inferVegetableSet(title, slot) {
   if (slot === 'snack') return ['1 kleine Frucht nach Wahl'];
 
   const vegetables = [];
-  if (hasWord(text, 'bohnen')) vegetables.push('120 g grüne Bohnen');
-  if (hasWord(text, 'spinat')) vegetables.push('80 g Spinat');
-  if (hasWord(text, 'brokkoli')) vegetables.push('120 g Brokkoli');
-  if (hasWord(text, 'tomaten?')) vegetables.push('120 g Tomaten');
-  if (hasWord(text, 'zucchini|zucchetti')) vegetables.push('120 g Zucchini');
-  if (hasWord(text, 'peperoni|paprika')) vegetables.push('100 g Peperoni');
+  if (hasStem(text, 'bohnen')) vegetables.push('120 g grüne Bohnen');
+  if (hasStem(text, 'spinat')) vegetables.push('80 g Spinat');
+  if (hasStem(text, 'brokkoli')) vegetables.push('120 g Brokkoli');
+  if (hasStem(text, 'tomaten?')) vegetables.push('120 g Tomaten');
+  if (hasStem(text, 'zucchini|zucchetti')) vegetables.push('120 g Zucchini');
+  if (hasStem(text, 'peperoni|paprika')) vegetables.push('100 g Peperoni');
 
   if (!vegetables.length) {
     vegetables.push(slot === 'fruehstueck' ? '150 g Früchte (Beeren oder Apfel)' : '220 g gemischtes Gemüse');
@@ -355,7 +369,35 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
     };
   }
 
-  if (vegan && hasWord(text, 'tofu|ruhrei|ruehrei')) {
+  if (vegan && hasStem(text, 'porridge')) {
+    return {
+      title,
+      ingredients: [
+        '55 g Haferflocken',
+        '180 ml Haferdrink',
+        '120 g Beeren',
+        '60 g Soja-Skyr natur',
+        '1 TL Chiasamen'
+      ],
+      steps: [
+        'Haferflocken mit Haferdrink aufkochen und 4–5 Minuten sanft köcheln lassen.',
+        'Porridge in eine Schale geben und mit Beeren toppen.',
+        'Soja-Skyr sowie Chiasamen darüber verteilen.'
+      ],
+      tipsShopping: [
+        'Ungesüssten Haferdrink und Soja-Skyr verwenden.',
+        'Beeren je nach Saison frisch oder tiefgekühlt einkaufen.'
+      ],
+      tipsCooking: [
+        'Beim Köcheln regelmäßig rühren, damit nichts ansetzt.',
+        'Soja-Skyr erst nach dem Kochen hinzufügen.'
+      ],
+      meta,
+      protein
+    };
+  }
+
+  if (vegan && hasStem(text, 'tofu|ruhrei|ruehrei')) {
     return {
       title,
       ingredients: [
@@ -463,7 +505,7 @@ function buildDinnerRecipe({ title, vegan, protein, meta }) {
   const vegetables = inferVegetableSet(title, 'abendessen');
   const text = normalizeText(title);
 
-  const includeOven = !hasWord(text, 'pfanne|stir[-\s]?fry');
+  const includeOven = !hasStem(text, 'pfanne|stir[-\s]?fry');
 
   const proteinStep = protein.family === 'fish'
     ? `${protein.key === 'thunfisch' ? 'Thunfisch abtropfen und am Schluss kurz unterheben.' : `${protein.key === 'lachs' ? 'Lachs' : 'Forelle'} trocken tupfen und 2–3 Minuten pro Seite braten.`}`
@@ -474,7 +516,8 @@ function buildDinnerRecipe({ title, vegan, protein, meta }) {
   const steps = [];
   if (includeOven) {
     steps.push('Backofen auf 200 °C vorheizen.');
-    steps.push(`${base.prep.replace(/\.$/, '')} und mit dem Gemüse im Ofen garen.`);
+    steps.push(base.prep);
+    steps.push('Gemüse mit etwas Öl, Salz und Pfeffer mischen und im Ofen bissfest garen.');
   } else {
     steps.push(base.prep);
     steps.push('Gemüse in einer großen Pfanne mit etwas Öl bissfest garen.');
@@ -657,10 +700,52 @@ function textContainsAny(text, tokens = []) {
   return tokens.some(token => hasStem(text, token));
 }
 
+const TITLE_CONSISTENCY_RULES = [
+  { pattern: 'pfanne|stir[-\\s]?fry', slots: ['abendessen'], mustInSteps: ['pfanne'], forbidInSteps: ['backofen', 'im ofen'] },
+  { pattern: 'ofen|blech', slots: ['abendessen'], mustInSteps: ['ofen'] },
+  { pattern: 'porridge', slots: ['fruehstueck'], mustInAll: ['hafer'], mustInSteps: ['koch|koechel|kochel'] },
+  { pattern: 'quinoa', mustInAll: ['quinoa'] },
+  { pattern: 'pasta|nudeln?|spaghetti|penne', mustInAll: ['pasta|nudel|spaghetti|penne'] },
+  { pattern: 'kartoffel', mustInAll: ['kartoffel'] },
+  { pattern: 'bohnen', mustInAll: ['bohnen'] },
+  { pattern: 'spinat', mustInAll: ['spinat'] }
+];
+
+const VEGAN_ANIMAL_PATTERNS = [
+  'poulet', 'huhn', 'rind', 'beef', 'forelle', 'lachs', 'thunfisch', 'fisch', 'eier', 'egg', 'huettenkaese', 'huttenkase', 'kefir'
+];
+
+function enforceTitleConsistency(recipe, slot, titleText, combinedText, stepsText) {
+  for (const rule of TITLE_CONSISTENCY_RULES) {
+    if (rule.slots && !rule.slots.includes(slot)) continue;
+    if (!hasStem(titleText, rule.pattern)) continue;
+
+    for (const token of (rule.mustInAll || [])) {
+      if (!hasStem(combinedText, token)) {
+        throw new Error(`Recipe consistency check failed for "${recipe.title}": title token "${rule.pattern}" missing expected ingredient/action (${token})`);
+      }
+    }
+
+    for (const token of (rule.mustInSteps || [])) {
+      if (!hasStem(stepsText, token)) {
+        throw new Error(`Recipe consistency check failed for "${recipe.title}": title token "${rule.pattern}" missing expected step (${token})`);
+      }
+    }
+
+    for (const token of (rule.forbidInSteps || [])) {
+      if (hasStem(stepsText, token)) {
+        throw new Error(`Recipe consistency check failed for "${recipe.title}": title token "${rule.pattern}" conflicts with step token (${token})`);
+      }
+    }
+  }
+}
+
 function validateRecipeConsistency(recipe, { slot, vegan, protein }) {
   if (slot === 'drink') return;
   if (!protein) throw new Error(`Recipe consistency check failed for "${recipe.title}": missing protein profile`);
 
+  const titleText = normalizeText(recipe.title || recipe.meta?.titleMarketing || '');
+  const stepsText = normalizeText((recipe.steps || []).join(' '));
   const combined = normalizeText([
     recipe.title,
     recipe.meta?.titleMarketing,
@@ -668,6 +753,12 @@ function validateRecipeConsistency(recipe, { slot, vegan, protein }) {
     ...(recipe.ingredients || []),
     ...(recipe.steps || [])
   ].join(' '));
+
+  enforceTitleConsistency(recipe, slot, titleText, combined, stepsText);
+
+  if (vegan && textContainsAny(combined, VEGAN_ANIMAL_PATTERNS)) {
+    throw new Error(`Recipe consistency check failed for "${recipe.title}": vegan recipe contains animal token`);
+  }
 
   const ownTokens = PROTEIN_TOKENS[protein.key] || [];
   if (ownTokens.length && !textContainsAny(combined, ownTokens)) {
