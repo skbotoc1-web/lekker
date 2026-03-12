@@ -8,6 +8,7 @@
     "start": "node src/index.js",
     "dev": "NODE_ENV=development node src/index.js",
     "test": "rm -f ./data/lekker.test.db && DB_PATH=./data/lekker.test.db node --test --test-concurrency=1 src/tests/*.test.js",
+    "test:codex": "npm run test && npm audit --audit-level=high",
     "seed": "node scripts/seed-guidelines.js",
     "hook:full": "node scripts/run-hook.js full"
   },
@@ -17,7 +18,7 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "node-cron": "^3.0.3",
-    "nodemailer": "^6.9.18",
+    "nodemailer": "^7.0.13",
     "zod": "^3.24.2"
   }
 }

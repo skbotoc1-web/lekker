@@ -11,12 +11,30 @@ const VEGAN_LIBRARY = {
   mittagessen: [
     { name: 'Linsen-Bowl mit Quinoa und Ofengemüse', keywords: ['linsen', 'quinoa', 'brokkoli', 'peperoni'] },
     { name: 'Kichererbsen-Curry mit Naturreis', keywords: ['kichererbsen', 'reis', 'spinat'] },
-    { name: 'Tofu-Stir-Fry mit Broccoli', keywords: ['tofu', 'brokkoli', 'zucchini'] }
+    { name: 'Tofu-Stir-Fry mit Broccoli', keywords: ['tofu', 'brokkoli', 'zucchini'] },
+    { name: 'Mediterrane Bohnenpfanne mit Bulgur', keywords: ['bohnen', 'tomaten', 'zucchini'] },
+    { name: 'Thai-Tofu-Curry mit Jasminreis', keywords: ['tofu', 'reis', 'peperoni'] },
+    { name: 'Kürbis-Kichererbsen-Eintopf', keywords: ['kichererbsen', 'kuerbis', 'karotten'] },
+    { name: 'Vollkornwrap mit Linsenfüllung', keywords: ['linsen', 'tomaten', 'gurken'] },
+    { name: 'Rote-Linsen-Dal mit Spinat', keywords: ['linsen', 'spinat', 'reis'] },
+    { name: 'Ofenblumenkohl mit Tahini-Quinoa', keywords: ['blumenkohl', 'quinoa', 'kichererbsen'] },
+    { name: 'Pilz-Gerste-Risotto', keywords: ['pilze', 'reis', 'spinat'] },
+    { name: 'Falafel-Bowl mit Kräutersalat', keywords: ['kichererbsen', 'gurken', 'tomaten'] },
+    { name: 'Veganes Pilz-Stroganoff mit Reis', keywords: ['pilze', 'reis', 'spinat'] }
   ],
   abendessen: [
     { name: 'Bohnen-Chili mit Mais und Avocado', keywords: ['bohnen', 'tomaten', 'peperoni'] },
     { name: 'Vollkornpasta mit Linsen-Bolognese', keywords: ['vollkornpasta', 'linsen', 'tomaten'] },
-    { name: 'Süsskartoffel-Tofu-Blech', keywords: ['süsskartoffeln', 'tofu', 'brokkoli'] }
+    { name: 'Süsskartoffel-Tofu-Blech', keywords: ['süsskartoffeln', 'tofu', 'brokkoli'] },
+    { name: 'Auberginen-Curry mit Kichererbsen', keywords: ['auberginen', 'kichererbsen', 'tomaten'] },
+    { name: 'Tofu-Satay mit Gemüse und Reis', keywords: ['tofu', 'reis', 'bohnen'] },
+    { name: 'Gefüllte Peperoni mit Linsen', keywords: ['peperoni', 'linsen', 'tomaten'] },
+    { name: 'Pilzragout mit Polenta', keywords: ['pilze', 'mais', 'spinat'] },
+    { name: 'Kräuter-Kartoffelpfanne mit Bohnen', keywords: ['kartoffeln', 'bohnen', 'zucchini'] },
+    { name: 'Spinat-Kichererbsen-Tajine', keywords: ['spinat', 'kichererbsen', 'tomaten'] },
+    { name: 'Ofenkarotten mit Linsen-Dip', keywords: ['karotten', 'linsen', 'kichererbsen'] },
+    { name: 'Kokos-Linsen-Curry mit Reis', keywords: ['linsen', 'reis', 'spinat'] },
+    { name: 'Gemüse-Paella mit Kichererbsen', keywords: ['reis', 'kichererbsen', 'peperoni'] }
   ],
   snack: [
     { name: 'Nussmix mit Apfel', keywords: ['nüsse', 'äpfel', 'birnen'] },
@@ -39,12 +57,30 @@ const OMNI_LIBRARY = {
   mittagessen: [
     { name: 'Poulet-Quinoa-Salat', keywords: ['pouletbrust', 'quinoa', 'gurken', 'tomaten'] },
     { name: 'Lachs mit Kartoffeln und Gemüse', keywords: ['lachs', 'kartoffeln', 'brokkoli'] },
-    { name: 'Rindstreifen mit Vollkornreis', keywords: ['rindfleisch', 'reis', 'peperoni'] }
+    { name: 'Rindstreifen mit Vollkornreis', keywords: ['rindfleisch', 'reis', 'peperoni'] },
+    { name: 'Rindsragout mit Wurzelgemüse', keywords: ['rindfleisch', 'karotten', 'kartoffeln'] },
+    { name: 'Poulet-Curry mit Basmatireis', keywords: ['pouletbrust', 'reis', 'spinat'] },
+    { name: 'Forellen-Bowl mit Kräuterreis', keywords: ['forelle', 'reis', 'gurken'] },
+    { name: 'Thunfisch-Reis-Salat', keywords: ['thunfisch', 'reis', 'tomaten'] },
+    { name: 'Poulet-Wrap mit Gemüse', keywords: ['pouletbrust', 'tomaten', 'gurken'] },
+    { name: 'Rindfleisch-Taco-Bowl', keywords: ['rindfleisch', 'peperoni', 'tomaten'] },
+    { name: 'Eier-Quinoa-Salat', keywords: ['eier', 'quinoa', 'tomaten'] },
+    { name: 'Lachs-Bulgur-Salat', keywords: ['lachs', 'bulgur', 'gurken'] },
+    { name: 'Poulet mit Ofenkartoffeln und Kräutern', keywords: ['pouletbrust', 'kartoffeln', 'brokkoli'] }
   ],
   abendessen: [
     { name: 'Forelle mit Ofengemüse', keywords: ['forelle', 'zucchini', 'kartoffeln'] },
     { name: 'Pouletpfanne mit Bohnen', keywords: ['pouletbrust', 'bohnen', 'tomaten'] },
-    { name: 'Protein-Pasta mit Thunfisch', keywords: ['vollkornpasta', 'thunfisch', 'tomaten'] }
+    { name: 'Protein-Pasta mit Thunfisch', keywords: ['vollkornpasta', 'thunfisch', 'tomaten'] },
+    { name: 'Rinderhack-Pfanne mit Zucchetti', keywords: ['rindfleisch', 'zucchini', 'tomaten'] },
+    { name: 'Lachs aus dem Ofen mit Dillkartoffeln', keywords: ['lachs', 'kartoffeln', 'dill'] },
+    { name: 'Poulet-Cacciatore mit Gemüse', keywords: ['pouletbrust', 'tomaten', 'peperoni'] },
+    { name: 'Forelle mit Kräuterpolenta', keywords: ['forelle', 'mais', 'spinat'] },
+    { name: 'Rindsgeschnetzeltes mit Pilzen', keywords: ['rindfleisch', 'pilze', 'reis'] },
+    { name: 'Thunfisch-Steak mit Bohnen', keywords: ['thunfisch', 'bohnen', 'tomaten'] },
+    { name: 'Lachs-Teriyaki mit Brokkoli', keywords: ['lachs', 'brokkoli', 'reis'] },
+    { name: 'Pouletbrust mit Zitronen-Risotto', keywords: ['pouletbrust', 'reis', 'zitrone'] },
+    { name: 'Rinderfilet mit Ofenkarotten', keywords: ['rindfleisch', 'karotten', 'kartoffeln'] }
   ],
   snack: [
     { name: 'Skyr mit Nüssen', keywords: ['skyr', 'nüsse'] },
@@ -77,6 +113,114 @@ function extractDishNameSignals(name = '') {
     .map(x => normalizeIngredient(x)?.canonical)
     .filter(Boolean)
     .map(x => norm(x));
+}
+
+function parseDay(day) {
+  const d = new Date(`${day}T00:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function dayGap(targetDay, historicDay) {
+  const target = parseDay(targetDay);
+  const historic = parseDay(historicDay);
+  if (!target || !historic) return null;
+  const diff = Math.round((target.getTime() - historic.getTime()) / 86400000);
+  return diff > 0 ? diff : null;
+}
+
+function dishThemes(name = '') {
+  const text = fold(name);
+  const themes = new Set();
+
+  if (/pasta|spaghetti|penne|nudel/.test(text)) themes.add('pasta');
+  if (/reis|risotto/.test(text)) themes.add('reis');
+  if (/quinoa/.test(text)) themes.add('quinoa');
+  if (/curry|masala/.test(text)) themes.add('curry');
+  if (/bowl/.test(text)) themes.add('bowl');
+  if (/pfanne|stir/.test(text)) themes.add('pfanne');
+  if (/blech|ofen/.test(text)) themes.add('ofen');
+  if (/salat/.test(text)) themes.add('salat');
+  if (/smoothie|shake/.test(text)) themes.add('smoothie');
+  if (/poulet|huhn/.test(text)) themes.add('protein:poulet');
+  if (/rind|beef/.test(text)) themes.add('protein:rind');
+  if (/lachs/.test(text)) themes.add('protein:lachs');
+  if (/forelle/.test(text)) themes.add('protein:forelle');
+  if (/thunfisch|fisch/.test(text)) themes.add('protein:fisch');
+  if (/tofu/.test(text)) themes.add('protein:tofu');
+  if (/linsen/.test(text)) themes.add('protein:linsen');
+
+  return [...themes];
+}
+
+function buildVariationHistory(targetDay, recentRows) {
+  const exactBySlot = new Map();
+  const themeCount = new Map();
+  const themeGap = new Map();
+
+  const entriesFromMenu = (row) => [
+    ['vegan', 'fruehstueck', row.vegan_breakfast],
+    ['vegan', 'mittagessen', row.vegan_lunch],
+    ['vegan', 'abendessen', row.vegan_dinner],
+    ['vegan', 'snack', row.vegan_snack],
+    ['omni', 'fruehstueck', row.omni_breakfast],
+    ['omni', 'mittagessen', row.omni_lunch],
+    ['omni', 'abendessen', row.omni_dinner],
+    ['omni', 'snack', row.omni_snack]
+  ];
+
+  for (const row of recentRows) {
+    const gap = dayGap(targetDay, row.day);
+    if (!gap || gap > 10) continue;
+
+    for (const [optionType, slot, dish] of entriesFromMenu(row)) {
+      const dishKey = `${optionType}:${slot}:${fold(dish).trim()}`;
+      const prevGap = exactBySlot.get(dishKey);
+      exactBySlot.set(dishKey, prevGap ? Math.min(prevGap, gap) : gap);
+
+      for (const theme of dishThemes(dish)) {
+        const keys = [
+          `${optionType}:${slot}:${theme}`,
+          `${optionType}:all:${theme}`,
+          `all:all:${theme}`
+        ];
+
+        for (const key of keys) {
+          themeCount.set(key, (themeCount.get(key) || 0) + 1);
+          const minGap = themeGap.get(key);
+          themeGap.set(key, minGap ? Math.min(minGap, gap) : gap);
+        }
+      }
+    }
+  }
+
+  return { exactBySlot, themeCount, themeGap };
+}
+
+function isExactDishBlocked(name, optionType, slot, history) {
+  const dishKey = `${optionType}:${slot}:${fold(name).trim()}`;
+  const exactGap = history.exactBySlot.get(dishKey);
+  return Boolean(exactGap && exactGap <= 10);
+}
+
+function variationPenaltyForDish(name, optionType, slot, history) {
+  let penalty = 0;
+  for (const theme of dishThemes(name)) {
+    const scopedCount = history.themeCount.get(`${optionType}:${slot}:${theme}`) || 0;
+    const optionCount = history.themeCount.get(`${optionType}:all:${theme}`) || 0;
+    const globalCount = history.themeCount.get(`all:all:${theme}`) || 0;
+
+    penalty += scopedCount * 22;
+    penalty += optionCount * 10;
+    penalty += globalCount * 5;
+
+    const scopedGap = history.themeGap.get(`${optionType}:${slot}:${theme}`);
+    const globalGap = history.themeGap.get(`all:all:${theme}`);
+
+    if (scopedGap && scopedGap <= 2) penalty += 160;
+    if (theme === 'pasta' && globalGap && globalGap <= 2) penalty += 520;
+  }
+
+  return penalty;
 }
 
 function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex) {
@@ -183,18 +327,34 @@ function buildOfferIndex(day) {
   return { idx, cat, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex };
 }
 
-function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex) {
-  const ranked = candidates
-    .map(c => ({
-      ...c,
-      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex),
-      repeated: recentMenusJoined.includes(c.name.toLowerCase())
-    }))
-    .sort((a, b) => {
-      if (a.repeated !== b.repeated) return a.repeated ? 1 : -1;
-      if (a.offerScore !== b.offerScore) return b.offerScore - a.offerScore;
-      return a.name.localeCompare(b.name, 'de-CH');
+function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex, variationHistory) {
+  const scored = candidates
+    .map(c => {
+      const offerScore = scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType, slotOfferIndex);
+      const repeated = recentMenusJoined.includes(c.name.toLowerCase());
+      const variationPenalty = variationPenaltyForDish(c.name, optionType, slot, variationHistory);
+      const exactBlocked = isExactDishBlocked(c.name, optionType, slot, variationHistory);
+      const totalScore = offerScore - variationPenalty - (repeated ? 250 : 0);
+
+      return {
+        ...c,
+        offerScore,
+        repeated,
+        variationPenalty,
+        exactBlocked,
+        totalScore
+      };
     });
+
+  const pool = scored.some(x => !x.exactBlocked)
+    ? scored.filter(x => !x.exactBlocked)
+    : scored;
+
+  const ranked = pool.sort((a, b) => {
+    if (a.totalScore !== b.totalScore) return b.totalScore - a.totalScore;
+    if (a.offerScore !== b.offerScore) return b.offerScore - a.offerScore;
+    return a.name.localeCompare(b.name, 'de-CH');
+  });
 
   return ranked[0].name;
 }
@@ -213,8 +373,8 @@ function isLandMeat(token) {
   return token === 'rind' || token === 'poulet';
 }
 
-function selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex) {
-  const defaultDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+function selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex, variationHistory) {
+  const defaultDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex, variationHistory);
 
   const lunchProtein = dishProteinToken(omniLunch);
   const dinnerProtein = dishProteinToken(defaultDinner);
@@ -229,24 +389,25 @@ function selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, cate
   });
 
   if (!constrained.length) return defaultDinner;
-  return pickCandidate(constrained, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+  return pickCandidate(constrained, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex, variationHistory);
 }
 
 export function createDailyMenu(day) {
-  const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
+  const recentRows = db.prepare('SELECT * FROM menus WHERE day < ? ORDER BY day DESC LIMIT 10').all(day);
   const recentText = JSON.stringify(recentRows).toLowerCase();
+  const variationHistory = buildVariationHistory(day, recentRows);
   const { idx: offerIndex, cat: categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex } = buildOfferIndex(day);
 
-  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'vegan', slotOfferIndex);
-  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'vegan', slotOfferIndex);
-  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'vegan', slotOfferIndex);
-  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'vegan', slotOfferIndex);
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'vegan', slotOfferIndex, variationHistory);
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'vegan', slotOfferIndex, variationHistory);
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'vegan', slotOfferIndex, variationHistory);
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'vegan', slotOfferIndex, variationHistory);
   const veganDrink = VEGAN_LIBRARY.drink[0].name;
 
-  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni', slotOfferIndex);
-  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni', slotOfferIndex);
-  const omniDinner = selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex);
-  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni', slotOfferIndex);
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni', slotOfferIndex, variationHistory);
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni', slotOfferIndex, variationHistory);
+  const omniDinner = selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex, variationHistory);
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni', slotOfferIndex, variationHistory);
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];

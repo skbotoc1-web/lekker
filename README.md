@@ -45,7 +45,7 @@ Leichtgewichtige WebApp für den Schweizer Markt: tägliche Menüvorschläge (ve
 - [x] Retailer-Crawler + Fallback-Strategie
 - [x] Zutaten-Normalisierung/Synonym-Harmonisierung über alle Händler
 - [x] Clustering + Kategoriezuordnung
-- [x] Menügenerator (Protein, Vegan/Omni, CO2, Anti-Wiederholung)
+- [x] Menügenerator (Protein, Vegan/Omni, CO2, **10-Tage-Variationsfenster** + Anti-Wiederholung)
 - [x] Rezeptgenerator
 - [x] Premium-Rezeptformat (Portionen, Tipps, Zeit, Schwierigkeit, kcal, CO₂-Ampel)
 - [x] Freigabe-Workflow (Token-Link)
@@ -63,6 +63,14 @@ RUN_PIPELINE_ON_BOOT=true npm start
 ```
 
 App: `http://localhost:8787`
+
+## Umfassender Tester (Code + Security)
+
+```bash
+npm run test:codex
+```
+
+Führt die komplette Testsuite plus Security-Audit (`npm audit --audit-level=high`) aus.
 
 ## One-command Deploy via SSH
 
