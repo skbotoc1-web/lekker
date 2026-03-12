@@ -146,3 +146,21 @@ test('boot repair regenerates legacy recipe sets with inconsistent titleMarketin
     assert.equal(meta.titleMarketing, row.title);
   }
 });
+
+test('lunch and dinner include cuisine spice/herb profile instead of plain salt-pepper only', () => {
+  resetData();
+  const menu = insertMenu('2099-07-05', {
+    omni_lunch: 'Rindstreifen mit Vollkornreis',
+    omni_dinner: 'Forelle mit Ofengemüse'
+  });
+
+  const rows = generateRecipesForMenu(menu).map(flattenRecipe);
+  const targets = rows.filter(r => r.option_type === 'omni' && ['mittagessen', 'abendessen'].includes(r.meal_slot));
+
+  assert.equal(targets.length, 2);
+  for (const row of targets) {
+    assert.equal(/gewürzprofil|gewurzprofil/.test(row.text), true);
+    assert.equal(/salz, pfeffer, kräuter/.test(row.text), false);
+    assert.equal(/oregano|thymian|paprika|kreuzkümmel|kurkuma|sumach|rosmarin|dill|ingwer/.test(row.text), true);
+  }
+});

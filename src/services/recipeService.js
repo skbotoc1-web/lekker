@@ -14,10 +14,6 @@ function normalizeText(value = '') {
     .replace(/\p{Diacritic}/gu, '');
 }
 
-function hasWord(text, pattern) {
-  return new RegExp(`\\b(${pattern})\\b`, 'i').test(text);
-}
-
 function hasStem(text, pattern) {
   return new RegExp(`(${pattern})`, 'i').test(text);
 }
@@ -274,7 +270,110 @@ function inferVegetableSet(title, slot) {
   return vegetables;
 }
 
-function buildMeta(slot, vegan, title, protein) {
+function monthFromMenuDay(day) {
+  if (!day) return new Date().getUTCMonth() + 1;
+  const parsed = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return new Date().getUTCMonth() + 1;
+  return parsed.getUTCMonth() + 1;
+}
+
+function seasonFromMonth(month) {
+  if ([12, 1, 2].includes(month)) return 'winter';
+  if ([3, 4, 5].includes(month)) return 'fruehling';
+  if ([6, 7, 8].includes(month)) return 'sommer';
+  return 'herbst';
+}
+
+function stableIndex(seed, max) {
+  if (!max) return 0;
+  let hash = 0;
+  for (const char of String(seed || 'lekker')) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return hash % max;
+}
+
+const SEASONAL_HERBS = {
+  winter: ['Rosmarin', 'Thymian', 'Majoran'],
+  fruehling: ['Bärlauch', 'Schnittlauch', 'Petersilie'],
+  sommer: ['Basilikum', 'Dill', 'Minze'],
+  herbst: ['Salbei', 'Estragon', 'Petersilie']
+};
+
+const CUISINE_PROFILES = {
+  alpin: {
+    label: 'alpin-schweizerisch',
+    spices: ['Muskat', 'Kümmel', 'Paprika edelsüss']
+  },
+  mediterran: {
+    label: 'mediterran',
+    spices: ['Oregano', 'Thymian', 'Paprika edelsüss']
+  },
+  levantinisch: {
+    label: 'levantinisch',
+    spices: ['Kreuzkümmel', 'Koriander', 'Sumach']
+  },
+  indisch: {
+    label: 'indisch',
+    spices: ['Kurkuma', 'Garam Masala', 'Kreuzkümmel']
+  },
+  asiatisch: {
+    label: 'asiatisch',
+    spices: ['Ingwer', 'Chili', 'Sesam']
+  },
+  mexikanisch: {
+    label: 'mexikanisch',
+    spices: ['Geräucherte Paprika', 'Kreuzkümmel', 'Oregano']
+  },
+  nordisch: {
+    label: 'nordisch',
+    spices: ['Dill', 'Senfsaat', 'Zitronenabrieb']
+  }
+};
+
+function inferCuisineKey(title, slot, protein, vegan) {
+  const text = normalizeText(title);
+
+  if (hasStem(text, 'curry|masala|dal|korma')) return 'indisch';
+  if (hasStem(text, 'chili|taco|mex')) return 'mexikanisch';
+  if (hasStem(text, 'stir|wok|thai|asia|asiat')) return 'asiatisch';
+  if (hasStem(text, 'hummus|sumach|kichererbsen|quinoa|bowl')) return 'levantinisch';
+  if (hasStem(text, 'pasta|bolognese|risotto|mediterran|ital')) return 'mediterran';
+
+  if (protein?.family === 'fish') return 'nordisch';
+  if (protein?.family === 'meat' && hasStem(text, 'rind|beef')) return 'alpin';
+  if (protein?.family === 'meat') return 'mediterran';
+  if (slot === 'fruehstueck' && vegan && hasStem(text, 'porridge')) return 'nordisch';
+
+  return vegan ? 'levantinisch' : 'alpin';
+}
+
+function buildFlavorProfile({ title, slot, protein, vegan, day }) {
+  const cuisineKey = inferCuisineKey(title, slot, protein, vegan);
+  const cuisine = CUISINE_PROFILES[cuisineKey] || CUISINE_PROFILES.alpin;
+  const month = monthFromMenuDay(day);
+  const season = seasonFromMonth(month);
+  const herbs = SEASONAL_HERBS[season] || SEASONAL_HERBS.herbst;
+  const herb = herbs[stableIndex(`${title}:${slot}:${season}`, herbs.length)];
+
+  const spiceIngredient = `Gewürzprofil (${cuisine.label}): ${cuisine.spices.join(', ')}`;
+  const herbIngredient = `Frische Kräuter (${season}): ${herb}`;
+
+  let spiceStep = `Gewürze (${cuisine.spices.join(', ')}) kurz im Öl anrösten, damit die Aromen sich entfalten.`;
+  if (slot === 'fruehstueck') spiceStep = `Gewürze (${cuisine.spices.join(', ')}) fein dosieren und harmonisch einarbeiten.`;
+  if (slot === 'snack') spiceStep = `Gewürze (${cuisine.spices.join(', ')}) direkt in Dip oder Topping einrühren.`;
+
+  return {
+    cuisineLabel: cuisine.label,
+    spices: cuisine.spices,
+    herb,
+    spiceIngredient,
+    herbIngredient,
+    spiceStep,
+    shoppingTip: `${cuisine.label}: Gewürze idealerweise ganz kaufen und frisch mörsern.`,
+    herbTip: `${herb} erst gegen Ende einarbeiten, damit Frische und Aroma erhalten bleiben.`
+  };
+}
+
+function buildMeta(slot, vegan, title, protein, flavor) {
   const defaults = {
     servings: 1,
     difficulty: slot === 'abendessen' ? 3 : slot === 'mittagessen' ? 2 : 1,
@@ -292,6 +391,10 @@ function buildMeta(slot, vegan, title, protein) {
   if (slot === 'snack') defaults.subtitle = `${title} als schneller, ausgewogener Protein-Snack.`;
   if (slot === 'drink') defaults.subtitle = `${title} – frisch, zuckerfrei und alltagstauglich.`;
 
+  if (flavor?.cuisineLabel) {
+    defaults.subtitle = `${defaults.subtitle} Inspiriert von ${flavor.cuisineLabel}er Küche mit ${flavor.herb}.`;
+  }
+
   if (protein?.family === 'fish') {
     defaults.co2Label = slot === 'abendessen' ? 'gelb' : defaults.co2Label;
     defaults.kcal = Math.max(320, defaults.kcal - 20);
@@ -308,7 +411,7 @@ function buildMeta(slot, vegan, title, protein) {
   return defaults;
 }
 
-function buildBreakfastRecipe({ title, vegan, protein, meta }) {
+function buildBreakfastRecipe({ title, vegan, protein, meta, flavor }) {
   const text = normalizeText(title);
 
   if (!vegan && protein.key === 'eier') {
@@ -320,21 +423,27 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
         '1 kleine Tomate, gewürfelt',
         '1 TL Olivenöl',
         '1 Scheibe Vollkornbrot',
-        'Salz, Pfeffer'
+        'Salz, Pfeffer',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
         'Backofen auf 180 °C vorheizen.',
         'Eier mit Salz und Pfeffer verquirlen, Spinat und Tomate einrühren.',
+        flavor.spiceStep,
         'Masse in eine kleine Form geben und 12–15 Minuten stocken lassen.',
+        `Zum Schluss ${flavor.herb} fein hacken und darübergeben.`,
         'Mit Vollkornbrot servieren.'
       ],
       tipsShopping: [
         protein.shoppingTip,
-        'Frischen Spinat bevorzugen; TK-Spinat gut ausdrücken.'
+        'Frischen Spinat bevorzugen; TK-Spinat gut ausdrücken.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         protein.cookingTip,
-        'Eiermischung nicht überbacken, damit sie saftig bleibt.'
+        'Eiermischung nicht überbacken, damit sie saftig bleibt.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -349,20 +458,25 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
         '2 Scheiben Vollkornbrot',
         '1 Tomate in Scheiben',
         '1 TL Olivenöl',
-        'Pfeffer, Kräuter'
+        'Pfeffer',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
         'Vollkornbrot kurz toasten.',
+        flavor.spiceStep,
         'Hüttenkäse auf dem Brot verteilen.',
-        'Tomate auflegen, mit Öl und Kräutern abschliessen.'
+        `Tomate auflegen, mit Öl und ${flavor.herb} abschliessen.`
       ],
       tipsShopping: [
         protein.shoppingTip,
-        'Brot mit hohem Vollkornanteil wählen.'
+        'Brot mit hohem Vollkornanteil wählen.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         protein.cookingTip,
-        'Tomaten erst kurz vor dem Servieren auflegen.'
+        'Tomaten erst kurz vor dem Servieren auflegen.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -377,20 +491,25 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
         '180 ml Haferdrink',
         '120 g Beeren',
         '60 g Soja-Skyr natur',
-        '1 TL Chiasamen'
+        '1 TL Chiasamen',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
         'Haferflocken mit Haferdrink aufkochen und 4–5 Minuten sanft köcheln lassen.',
+        flavor.spiceStep,
         'Porridge in eine Schale geben und mit Beeren toppen.',
-        'Soja-Skyr sowie Chiasamen darüber verteilen.'
+        `Soja-Skyr sowie Chiasamen darüber verteilen und mit ${flavor.herb} fein abrunden.`
       ],
       tipsShopping: [
         'Ungesüssten Haferdrink und Soja-Skyr verwenden.',
-        'Beeren je nach Saison frisch oder tiefgekühlt einkaufen.'
+        'Beeren je nach Saison frisch oder tiefgekühlt einkaufen.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         'Beim Köcheln regelmäßig rühren, damit nichts ansetzt.',
-        'Soja-Skyr erst nach dem Kochen hinzufügen.'
+        'Soja-Skyr erst nach dem Kochen hinzufügen.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -406,21 +525,26 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
         '1 TL Rapsöl',
         '80 g Tomatenwürfel',
         '1 Scheibe Vollkorntoast',
-        'Salz, Pfeffer'
+        'Salz, Pfeffer',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
         'Tofu mit einer Gabel grob zerdrücken.',
+        flavor.spiceStep,
         'Öl in einer Pfanne erhitzen und Tofu mit Kurkuma 3–4 Minuten braten.',
         'Tomaten unterheben und kurz mitgaren.',
-        'Mit Salz und Pfeffer abschmecken und mit Toast servieren.'
+        `Mit Salz und Pfeffer abschmecken, ${flavor.herb} einstreuen und mit Toast servieren.`
       ],
       tipsShopping: [
         protein.shoppingTip,
-        'Kurkuma für Farbe und milde Würze nutzen.'
+        'Kurkuma für Farbe und milde Würze nutzen.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         protein.cookingTip,
-        'Tofu nicht zu fein zerdrücken, sonst wird die Textur breiig.'
+        'Tofu nicht zu fein zerdrücken, sonst wird die Textur breiig.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -435,28 +559,33 @@ function buildBreakfastRecipe({ title, vegan, protein, meta }) {
       '50 g Haferflocken',
       '150 g Früchte (Beeren oder Apfel)',
       vegan ? '1 TL Chiasamen' : '1 TL Leinsamen',
-      'etwas Zimt'
+      'etwas Zimt',
+      flavor.spiceIngredient,
+      flavor.herbIngredient
     ],
     steps: [
       'Haferflocken 2 Minuten trocken anrösten.',
+      flavor.spiceStep,
       `${vegan ? 'Soja-Skyr' : 'Skyr'} in eine Schale geben.`,
       'Früchte und Haferflocken darauf verteilen.',
-      'Mit Samen und etwas Zimt abschliessen.'
+      `Mit Samen, etwas Zimt und ${flavor.herb} abschliessen.`
     ],
     tipsShopping: [
       vegan ? 'Soja-Skyr nature ohne Zuckerzusatz wählen.' : protein.shoppingTip,
-      'Saisonale Früchte bevorzugen.'
+      'Saisonale Früchte bevorzugen.',
+      flavor.shoppingTip
     ],
     tipsCooking: [
       vegan ? 'Pflanzliche Basis ungesüsst halten.' : protein.cookingTip,
-      'Toppings erst kurz vor dem Essen hinzufügen.'
+      'Toppings erst kurz vor dem Essen hinzufügen.',
+      flavor.herbTip
     ],
     meta,
     protein
   };
 }
 
-function buildLunchRecipe({ title, vegan, protein, meta }) {
+function buildLunchRecipe({ title, vegan, protein, meta, flavor }) {
   const base = inferBaseComponent(title, 'mittagessen');
   const vegetables = inferVegetableSet(title, 'mittagessen');
 
@@ -478,29 +607,34 @@ function buildLunchRecipe({ title, vegan, protein, meta }) {
       ...vegetables,
       '1 EL Raps- oder Olivenöl',
       'Saft von 1/2 Zitrone',
-      'Salz, Pfeffer, Kräuter'
+      'Salz, Pfeffer',
+      flavor.spiceIngredient,
+      flavor.herbIngredient
     ],
     steps: [
       base.prep,
+      flavor.spiceStep,
       proteinStep,
       'Gemüse mundgerecht schneiden und mit der Basis mischen.',
-      'Dressing aus Öl, Zitrone, Kräutern, Salz und Pfeffer rühren.',
+      `Dressing aus Öl, Zitrone, ${flavor.herb}, Salz und Pfeffer rühren.`,
       `${plantProtein ? 'Pflanzliches Protein' : 'Protein'} auf der Basis anrichten und Dressing darübergeben.`
     ],
     tipsShopping: [
       protein.shoppingTip,
-      'Gemüse möglichst saisonal auswählen.'
+      'Gemüse möglichst saisonal auswählen.',
+      flavor.shoppingTip
     ],
     tipsCooking: [
       protein.cookingTip,
-      'Dressing erst vor dem Servieren dazugeben.'
+      'Dressing erst vor dem Servieren dazugeben.',
+      flavor.herbTip
     ],
     meta,
     protein
   };
 }
 
-function buildDinnerRecipe({ title, vegan, protein, meta }) {
+function buildDinnerRecipe({ title, vegan, protein, meta, flavor }) {
   const base = inferBaseComponent(title, 'abendessen');
   const vegetables = inferVegetableSet(title, 'abendessen');
   const text = normalizeText(title);
@@ -522,8 +656,9 @@ function buildDinnerRecipe({ title, vegan, protein, meta }) {
     steps.push(base.prep);
     steps.push('Gemüse in einer großen Pfanne mit etwas Öl bissfest garen.');
   }
+  steps.push(flavor.spiceStep);
   steps.push(proteinStep);
-  steps.push('Alles zusammen anrichten und mit Zitronensaft, Salz und Pfeffer abschliessen.');
+  steps.push(`Alles zusammen anrichten, mit ${flavor.herb} verfeinern und mit Zitronensaft, Salz und Pfeffer abschliessen.`);
 
   return {
     title,
@@ -533,46 +668,55 @@ function buildDinnerRecipe({ title, vegan, protein, meta }) {
       ...vegetables,
       '1 EL Raps- oder Olivenöl',
       'etwas Zitronensaft',
-      'Salz, Pfeffer, Kräuter'
+      'Salz, Pfeffer',
+      flavor.spiceIngredient,
+      flavor.herbIngredient
     ],
     steps,
     tipsShopping: [
       protein.shoppingTip,
-      'Gemüse nach Saison variieren für bessere CO₂-Bilanz.'
+      'Gemüse nach Saison variieren für bessere CO₂-Bilanz.',
+      flavor.shoppingTip
     ],
     tipsCooking: [
       protein.cookingTip,
-      'Hitze kontrollieren, Öl nicht rauchen lassen.'
+      'Hitze kontrollieren, Öl nicht rauchen lassen.',
+      flavor.herbTip
     ],
     meta,
     protein
   };
 }
 
-function buildSnackRecipe({ title, vegan, protein, meta }) {
+function buildSnackRecipe({ title, vegan, protein, meta, flavor }) {
   const text = normalizeText(title);
 
-  if (vegan && hasWord(text, 'hummus|kichererbsen')) {
+  if (vegan && hasStem(text, 'hummus|kichererbsen')) {
     return {
       title,
       ingredients: [
         '120 g Hummus',
         '100 g Gemüsesticks (Karotte, Gurke)',
         '1 TL Olivenöl',
-        'Paprika, Salz'
+        'Paprika, Salz',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
         'Gemüse in Sticks schneiden.',
-        'Hummus in eine Schale geben und mit Öl sowie Paprika toppen.',
+        flavor.spiceStep,
+        `Hummus in eine Schale geben, mit Öl sowie ${flavor.herb} toppen.`,
         'Mit Gemüsesticks servieren.'
       ],
       tipsShopping: [
         'Hummus mit kurzer Zutatenliste wählen.',
-        'Gemüse frisch und knackig einkaufen.'
+        'Gemüse frisch und knackig einkaufen.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         'Gemüse erst kurz vor dem Essen schneiden.',
-        'Hummus bei Bedarf mit Zitronensaft auffrischen.'
+        'Hummus bei Bedarf mit Zitronensaft auffrischen.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -586,19 +730,24 @@ function buildSnackRecipe({ title, vegan, protein, meta }) {
         '250 ml Kefir nature',
         '1/2 Banane',
         '1 EL Haferflocken',
-        'etwas Zimt'
+        'etwas Zimt',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
+        flavor.spiceStep,
         'Alle Zutaten in den Mixer geben.',
-        '20–30 Sekunden cremig mixen und kalt servieren.'
+        `20–30 Sekunden cremig mixen, mit ${flavor.herb} abrunden und kalt servieren.`
       ],
       tipsShopping: [
         protein.shoppingTip,
-        'Reife Banane für natürliche Süsse verwenden.'
+        'Reife Banane für natürliche Süsse verwenden.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         protein.cookingTip,
-        'Nicht zu lange mixen, damit die Textur frisch bleibt.'
+        'Nicht zu lange mixen, damit die Textur frisch bleibt.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -611,19 +760,24 @@ function buildSnackRecipe({ title, vegan, protein, meta }) {
       ingredients: [
         protein.ingredient,
         '1 Birne',
-        '10 g Nüsse'
+        '10 g Nüsse',
+        flavor.spiceIngredient,
+        flavor.herbIngredient
       ],
       steps: [
+        flavor.spiceStep,
         'Käse in mundgerechte Würfel schneiden.',
-        'Birne in Spalten schneiden und mit Nüssen servieren.'
+        `Birne in Spalten schneiden, mit Nüssen und ${flavor.herb} servieren.`
       ],
       tipsShopping: [
         protein.shoppingTip,
-        'Birne eher festreif wählen.'
+        'Birne eher festreif wählen.',
+        flavor.shoppingTip
       ],
       tipsCooking: [
         protein.cookingTip,
-        'Snacks kurz vor dem Servieren anrichten.'
+        'Snacks kurz vor dem Servieren anrichten.',
+        flavor.herbTip
       ],
       meta,
       protein
@@ -635,19 +789,24 @@ function buildSnackRecipe({ title, vegan, protein, meta }) {
     ingredients: [
       vegan ? '30 g Nussmix' : '150 g Skyr nature',
       vegan ? '1 Apfel' : '20 g Nüsse',
-      vegan ? 'optional: 1 EL Hummus als Dip' : 'optional: 2 Apfelschnitze'
+      vegan ? 'optional: 1 EL Hummus als Dip' : 'optional: 2 Apfelschnitze',
+      flavor.spiceIngredient,
+      flavor.herbIngredient
     ],
     steps: [
+      flavor.spiceStep,
       vegan ? 'Nussmix in eine kleine Schale geben.' : 'Skyr in eine Schale geben.',
-      vegan ? 'Apfel in Stücke schneiden und dazu servieren.' : 'Nüsse darüberstreuen und optional mit Apfel ergänzen.'
+      vegan ? `Apfel in Stücke schneiden und mit ${flavor.herb} servieren.` : `Nüsse darüberstreuen und optional mit Apfel sowie ${flavor.herb} ergänzen.`
     ],
     tipsShopping: [
       vegan ? 'Ungesalzene Nüsse wählen.' : protein.shoppingTip,
-      'Zutaten ohne zugesetzten Zucker bevorzugen.'
+      'Zutaten ohne zugesetzten Zucker bevorzugen.',
+      flavor.shoppingTip
     ],
     tipsCooking: [
       vegan ? 'Apfel erst kurz vor dem Essen schneiden.' : protein.cookingTip,
-      'Nüsse zum Schluss hinzufügen für besseren Crunch.'
+      'Nüsse zum Schluss hinzufügen für besseren Crunch.',
+      flavor.herbTip
     ],
     meta,
     protein
@@ -686,9 +845,9 @@ const PROTEIN_TOKENS = {
   sojaskyr: ['soja', 'skyr'],
   poulet: ['poulet', 'huhn', 'hahnchen', 'haehnchen'],
   rind: ['rind', 'beef'],
-  forelle: ['forelle', 'fisch'],
-  lachs: ['lachs', 'fisch'],
-  thunfisch: ['thunfisch', 'fisch'],
+  forelle: ['forelle'],
+  lachs: ['lachs'],
+  thunfisch: ['thunfisch'],
   skyr: ['skyr'],
   huettenkaese: ['huttenkase', 'huettenkaese', 'hüttenkäse', 'hüttenkase'],
   eier: ['eier', 'egg'],
@@ -713,6 +872,12 @@ const TITLE_CONSISTENCY_RULES = [
 
 const VEGAN_ANIMAL_PATTERNS = [
   'poulet', 'huhn', 'rind', 'beef', 'forelle', 'lachs', 'thunfisch', 'fisch', 'eier', 'egg', 'huettenkaese', 'huttenkase', 'kefir'
+];
+
+const SPICE_SIGNAL_PATTERNS = [
+  'muskat', 'kummel', 'paprika', 'oregano', 'thymian', 'kreuzkummel', 'koriander', 'sumach', 'kurkuma',
+  'masala', 'ingwer', 'chili', 'dill', 'senfsaat', 'zitronenabrieb', 'rosmarin', 'salbei', 'estragon',
+  'petersilie', 'schnittlauch', 'barlauch', 'basilikum', 'minze'
 ];
 
 function enforceTitleConsistency(recipe, slot, titleText, combinedText, stepsText) {
@@ -760,6 +925,10 @@ function validateRecipeConsistency(recipe, { slot, vegan, protein }) {
     throw new Error(`Recipe consistency check failed for "${recipe.title}": vegan recipe contains animal token`);
   }
 
+  if (['mittagessen', 'abendessen', 'snack'].includes(slot) && !textContainsAny(combined, SPICE_SIGNAL_PATTERNS)) {
+    throw new Error(`Recipe consistency check failed for "${recipe.title}": missing cuisine-level spice/herb profile`);
+  }
+
   const ownTokens = PROTEIN_TOKENS[protein.key] || [];
   if (ownTokens.length && !textContainsAny(combined, ownTokens)) {
     throw new Error(`Recipe consistency check failed for "${recipe.title}": primary protein "${protein.key}" missing in ingredients/steps`);
@@ -786,14 +955,15 @@ function validateRecipeConsistency(recipe, { slot, vegan, protein }) {
   }
 }
 
-function buildBySlot(slot, vegan, title) {
+function buildBySlot(slot, vegan, title, day) {
   const protein = inferProteinProfile(title, vegan, slot);
-  const meta = buildMeta(slot, vegan, title, protein);
+  const flavor = buildFlavorProfile({ title, slot, protein, vegan, day });
+  const meta = buildMeta(slot, vegan, title, protein, flavor);
 
-  if (slot === 'fruehstueck') return buildBreakfastRecipe({ title, vegan, protein, meta });
-  if (slot === 'mittagessen') return buildLunchRecipe({ title, vegan, protein, meta });
-  if (slot === 'abendessen') return buildDinnerRecipe({ title, vegan, protein, meta });
-  if (slot === 'snack') return buildSnackRecipe({ title, vegan, protein, meta });
+  if (slot === 'fruehstueck') return buildBreakfastRecipe({ title, vegan, protein, meta, flavor });
+  if (slot === 'mittagessen') return buildLunchRecipe({ title, vegan, protein, meta, flavor });
+  if (slot === 'abendessen') return buildDinnerRecipe({ title, vegan, protein, meta, flavor });
+  if (slot === 'snack') return buildSnackRecipe({ title, vegan, protein, meta, flavor });
   return buildDrinkRecipe({ title, meta });
 }
 
@@ -865,7 +1035,7 @@ export function generateRecipesForMenu(menu) {
 
   const stmt = db.prepare('INSERT INTO recipes (menu_id, option_type, meal_slot, title, ingredients, steps, meta) VALUES (?, ?, ?, ?, ?, ?, ?)');
   for (const [optionType, slot, title, vegan] of entries) {
-    const recipe = buildBySlot(slot, vegan, title);
+    const recipe = buildBySlot(slot, vegan, title, menu.day);
     const meta = normalizeSlotMeta({
       ...recipe.meta,
       titleMarketing: title,

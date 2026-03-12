@@ -199,6 +199,39 @@ function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex,
   return ranked[0].name;
 }
 
+function dishProteinToken(name = '') {
+  const text = fold(name);
+  if (text.includes('rind')) return 'rind';
+  if (text.includes('poulet') || text.includes('huhn')) return 'poulet';
+  if (text.includes('forelle')) return 'forelle';
+  if (text.includes('lachs')) return 'lachs';
+  if (text.includes('thunfisch') || text.includes('fisch')) return 'fisch';
+  return 'other';
+}
+
+function isLandMeat(token) {
+  return token === 'rind' || token === 'poulet';
+}
+
+function selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex) {
+  const defaultDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+
+  const lunchProtein = dishProteinToken(omniLunch);
+  const dinnerProtein = dishProteinToken(defaultDinner);
+
+  if (!(isLandMeat(lunchProtein) && isLandMeat(dinnerProtein) && lunchProtein !== dinnerProtein)) {
+    return defaultDinner;
+  }
+
+  const constrained = OMNI_LIBRARY.abendessen.filter(candidate => {
+    const protein = dishProteinToken(candidate.name);
+    return protein === lunchProtein || !isLandMeat(protein);
+  });
+
+  if (!constrained.length) return defaultDinner;
+  return pickCandidate(constrained, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+}
+
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
@@ -212,7 +245,7 @@ export function createDailyMenu(day) {
 
   const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni', slotOfferIndex);
   const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni', slotOfferIndex);
-  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni', slotOfferIndex);
+  const omniDinner = selectOmniDinnerWithConsistency(omniLunch, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slotOfferIndex);
   const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni', slotOfferIndex);
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
