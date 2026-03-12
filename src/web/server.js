@@ -126,33 +126,6 @@ function renderInfoState({ title, message, backLinks = [] }) {
   return `<article class='card'><h1>${title}</h1><p class='lead'>${message}</p>${links}</article>`;
 }
 
-function dayRotationIndex(seed, max) {
-  if (!max) return 0;
-  const base = Number(String(seed || '').replace(/-/g, '')) || 1;
-  return base % max;
-}
-
-function getTodayRecommendations(day) {
-  const rows = db.prepare('SELECT r.id, r.title, r.meta, r.option_type, r.meal_slot, m.day FROM recipes r JOIN menus m ON m.id = r.menu_id ORDER BY r.id DESC LIMIT 24').all();
-  if (!rows.length) return [];
-  const start = dayRotationIndex(day, rows.length);
-  const rotated = [...rows.slice(start), ...rows.slice(0, start)];
-  return rotated.slice(0, 3).map(r => {
-    const meta = JSON.parse(r.meta || '{}');
-    return {
-      id: r.id,
-      title: meta.titleMarketing || r.title,
-      option: r.option_type,
-      slot: r.meal_slot,
-      day: r.day,
-      kcal: meta.kcal || '-',
-      proteinHint: meta.proteinHint || 'n/a',
-      co2Label: meta.co2Label || '-',
-      timeMin: meta.timeMin || '-'
-    };
-  });
-}
-
 export function createServer() {
   const app = express();
   app.use(express.static('public'));
@@ -640,15 +613,12 @@ export function createServer() {
           ? '<p class="lead">Heute frisch kuratiert mit vollständigen Rezepten.</p>'
           : `<p class="lead">Für heute ist noch kein vollständiges Menü da. Hier der letzte komplette Stand vom <strong>${menu.day}</strong>.</p>`;
 
-    const recommended = getTodayRecommendations(menu.day);
-    const recCards = recommended.map(r => `<article class='card recipe-index-card'><p class='eyebrow'>heute empfohlen · ${r.option === 'vegan' ? 'vegan' : 'nicht-vegan'} · ${slotLabel(r.slot)}</p><h3>${r.title}</h3><p class='meta-inline'>${r.timeMin} Min · ${r.kcal} kcal · ${r.proteinHint} · CO₂ ${r.co2Label}</p><a class='recipe-link' href='/rezept/${r.option}/${r.day}/${r.slot}?rid=${r.id}'>Zum Rezept</a></article>`).join('');
     const faq = [
       ['Was koche ich heute?', 'Nutze das Tagesmenü mit vollständigen Rezepten und direkter Einkaufsliste.'],
       ['Was, wenn es schnell gehen muss?', 'Filtere in den Kategorien nach schnell und fokussiere auf Rezepte unter 30 Minuten.']
     ];
     const jsonLd = [
       { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
-      { '@context': 'https://schema.org', '@type': 'ItemList', name: 'Heute empfohlen', itemListElement: recommended.map((r, i) => ({ '@type': 'ListItem', position: i + 1, url: `/rezept/${r.option}/${r.day}/${r.slot}` })) },
       { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ '@type': 'ListItem', position: 1, name: 'Start', item: '/' }] }
     ];
 
@@ -656,7 +626,7 @@ export function createServer() {
       title: isDraft ? `lekker – Entwurf ${menu.day}` : (mode === 'today-complete' ? `lekker – Tagesmenü ${menu.day}` : `lekker – Menü ${menu.day}`),
       description: 'Protein-fokussierte Menüvorschläge für den Schweizer Markt mit klaren Rezeptstatus.',
       canonical: '/',
-      body: `<h1>${heading}</h1>${intro}<p class='meta-inline'>Zuletzt aktualisiert: ${new Date().toISOString().slice(0, 10)}</p>${menuCards(menu, recipeLookup)}<section class='card'><h2>Heute empfohlen</h2><div class='recipe-index-grid'>${recCards || '<p>Empfehlungen werden aufgebaut.</p>'}</div></section><p><a href='/wochenplan/print'>Wochenplan + Einkaufsliste drucken</a> · <a href='/was-koche-ich-heute-schweiz'>Intent-Hub</a> · <a href='/menue'>Vergangene Menüs ansehen →</a></p>`,
+      body: `<h1>${heading}</h1>${intro}<p class='meta-inline'>Zuletzt aktualisiert: ${new Date().toISOString().slice(0, 10)}</p>${menuCards(menu, recipeLookup)}<p><a href='/wochenplan/print'>Wochenplan + Einkaufsliste drucken</a> · <a href='/was-koche-ich-heute-schweiz'>Intent-Hub</a> · <a href='/menue'>Vergangene Menüs ansehen →</a></p>`,
       jsonLd
     }));
   });
