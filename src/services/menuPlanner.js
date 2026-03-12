@@ -1,6 +1,6 @@
 import { db } from '../core/db.js';
 import { estimateDishCo2 } from '../data/co2Factors.js';
-import { canonicalToken, ingredientCategory, normalizeIngredient } from './ingredientNormalizer.js';
+import { canonicalToken, harmonizeRetailerIngredientMap, ingredientCategory, normalizeIngredient } from './ingredientNormalizer.js';
 
 const VEGAN_LIBRARY = {
   fruehstueck: [
@@ -79,7 +79,7 @@ function extractDishNameSignals(name = '') {
     .map(x => norm(x));
 }
 
-function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, slot, optionType) {
+function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType) {
   let matchedKeywords = 0;
 
   const keywordScore = dish.keywords.reduce((score, kw) => {
@@ -105,8 +105,10 @@ function scoreDishByOffers(dish, offerIndex, categoryIndex, slotSignals, retaile
     const categoryBoost = taxonomyPresence > 0 ? 1.12 + Math.min(0.1, taxonomyPresence * 0.02) : 1;
     const retailerSpread = Math.max(retailerDiversityByKey.get(key) || 0, fuzzyRetailers);
     const diversityBoost = 1 + Math.min(0.18, retailerSpread * 0.06);
+    const consensusMentions = retailerConsensus.get(key) || 0;
+    const consensusBoost = 1 + Math.min(0.16, consensusMentions * 0.04);
 
-    return score + (base * proteinBoost * dinnerProteinBoost * categoryBoost * diversityBoost);
+    return score + (base * proteinBoost * dinnerProteinBoost * categoryBoost * diversityBoost * consensusBoost);
   }, 0);
 
   const coverage = dish.keywords.length ? matchedKeywords / dish.keywords.length : 0;
@@ -149,14 +151,28 @@ function buildOfferIndex(day) {
   }
 
   const retailerDiversityByKey = new Map([...retailerSpread.entries()].map(([k, set]) => [k, set.size]));
-  return { idx, cat, slotSignals, retailerDiversityByKey };
+  const harmonized = harmonizeRetailerIngredientMap(
+    todayOffers.reduce((acc, row) => {
+      const retailer = row.source_retailer || 'unknown';
+      if (!acc[retailer]) acc[retailer] = [];
+      acc[retailer].push({ item: row.item });
+      return acc;
+    }, {})
+  );
+  const retailerConsensus = new Map(
+    Object.values(harmonized)
+      .map(row => [norm(row.canonical), row.mentions])
+      .filter(([key]) => Boolean(key))
+  );
+
+  return { idx, cat, slotSignals, retailerDiversityByKey, retailerConsensus };
 }
 
-function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, slot, optionType) {
+function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType) {
   const ranked = candidates
     .map(c => ({
       ...c,
-      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, slot, optionType),
+      offerScore: scoreDishByOffers(c, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, slot, optionType),
       repeated: recentMenusJoined.includes(c.name.toLowerCase())
     }))
     .sort((a, b) => {
@@ -171,18 +187,18 @@ function pickCandidate(candidates, recentMenusJoined, offerIndex, categoryIndex,
 export function createDailyMenu(day) {
   const recentRows = db.prepare('SELECT * FROM menus ORDER BY day DESC LIMIT 10').all();
   const recentText = JSON.stringify(recentRows).toLowerCase();
-  const { idx: offerIndex, cat: categoryIndex, slotSignals, retailerDiversityByKey } = buildOfferIndex(day);
+  const { idx: offerIndex, cat: categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus } = buildOfferIndex(day);
 
-  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'fruehstueck', 'vegan');
-  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'mittagessen', 'vegan');
-  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'abendessen', 'vegan');
-  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'snack', 'vegan');
+  const veganBreakfast = pickCandidate(VEGAN_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'vegan');
+  const veganLunch = pickCandidate(VEGAN_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'vegan');
+  const veganDinner = pickCandidate(VEGAN_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'vegan');
+  const veganSnack = pickCandidate(VEGAN_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'vegan');
   const veganDrink = VEGAN_LIBRARY.drink[0].name;
 
-  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'fruehstueck', 'omni');
-  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'mittagessen', 'omni');
-  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'abendessen', 'omni');
-  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, 'snack', 'omni');
+  const omniBreakfast = pickCandidate(OMNI_LIBRARY.fruehstueck, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'fruehstueck', 'omni');
+  const omniLunch = pickCandidate(OMNI_LIBRARY.mittagessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'mittagessen', 'omni');
+  const omniDinner = pickCandidate(OMNI_LIBRARY.abendessen, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'abendessen', 'omni');
+  const omniSnack = pickCandidate(OMNI_LIBRARY.snack, recentText, offerIndex, categoryIndex, slotSignals, retailerDiversityByKey, retailerConsensus, 'snack', 'omni');
   const omniDrink = OMNI_LIBRARY.drink[0].name;
 
   const dishes = [veganBreakfast, veganLunch, veganDinner, omniBreakfast, omniLunch, omniDinner];

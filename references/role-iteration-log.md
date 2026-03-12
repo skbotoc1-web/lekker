@@ -188,3 +188,19 @@ Integration Review:
 - Ingredient-Harmonisierung liefert konsistentere Canonicals trotz Retail-Label/Unit/Promo-Rauschen.
 - Ingredient-to-menu Matching trifft Angebotslage besser (z.B. „Thunfischchunks“ → passende Dinner-Auswahl) bei unverändert leichtgewichtigem Stack.
 
+## Iteration 13
+
+| Rolle | Beitrag | Risiko | Decision |
+|---|---|---|---|
+| CEO | Night-Loop auf messbaren Quality-Impact gehalten: bessere Händler-Extraktion, bessere Canonicals, stabiler SEO-Intent-Pfad | Scope drift in neue Frontend-Flächen | Nur bestehende SSR-Seiten + Datenpipeline vertieft |
+| CTO | Crawler verfeinert mit delimiter-splitting und Meta-Fallbacks, Source-Weighting erweitert; Matching ergänzt um cross-retailer consensus Signal | zusätzliche Heuristikregeln | kleine pure helper + konservative Gewichte + Fallback-Kette aktiv |
+| CFO | Lightweight-Guardrail erneut eingehalten (0 neue Dependencies, nur Service-/Test-Anpassungen) | Heuristik-Wartungsaufwand | testgetriebene kleine Module statt Framework-Ausbau |
+| Designer | Intent-Landing/Cluster/FAQ/Export-Flows stabil gehalten; Structured-Data-Präsenz über Tests abgesichert | visuell wenig neues UI | bewusst Content-/Relevanz-Optimierung statt UI-Aufblähung |
+| Nutrition Lead | Harmonisierung erweitert (Retail-Noise-Strip + zusätzliche Synonymketten wie griechischer Joghurt/thunfisch in Wasser) für robustere Canonicals | Fehlklassifizierung bei Longtail-Labels | Canonical-first mit konservativem Soft-Fallback |
+| AgentOps Lead | Regression-Tests ergänzt: delimiter-heavy labels, meta fallback, retailer noise cleanup, structured-data assertions | leicht längere Tests | fokussierte kleine Fixtures, Gesamtsuite bleibt schnell |
+
+Integration Review:
+- Extraktionsqualität für Migros/Coop/Aldi/Lidl wurde durch zusätzliche Fallback-Signale (inkl. Meta + fragmentierte Labels) robuster.
+- Ingredient-Normalisierung/Harmonisierung harmonisiert Retail-spezifisches Noise besser und verbessert cross-retailer Canonical-Qualität.
+- Ingredient-to-menu Matching berücksichtigt nun zusätzlich retailerübergreifende Konsens-Signale bei der Gerichtsauswahl, ohne neue Laufzeitabhängigkeiten.
+

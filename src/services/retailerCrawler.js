@@ -102,10 +102,21 @@ function collectJsonNames($) {
   return out;
 }
 
+function splitCandidateText(value) {
+  return String(value || '')
+    .split(/[|•·,;]|\s+-\s+|\s+\/\s+|\s+und\s+/gi)
+    .map(x => x.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
 function pushCandidate(out, value, sourceTag) {
-  const txt = String(value || '').trim();
-  if (!txt || txt.length < 3) return;
-  out.push({ value: txt, sourceTag });
+  const chunks = splitCandidateText(value);
+  for (const chunk of chunks) {
+    const txt = String(chunk || '').trim();
+    if (!txt || txt.length < 3 || txt.length > 90) continue;
+    out.push({ value: txt, sourceTag });
+  }
 }
 
 function collectSelectorCandidates($, selectors) {
@@ -122,6 +133,15 @@ function collectSelectorCandidates($, selectors) {
       if (dataName) pushCandidate(out, dataName, `attr:data:${selector}`);
     });
   }
+  return out;
+}
+
+function collectMetaCandidates($) {
+  const out = [];
+  $('meta[property="og:title"], meta[name="title"], meta[name="description"], meta[property="og:description"]').each((_, el) => {
+    const content = $(el).attr('content');
+    if (content) pushCandidate(out, content, `meta:${$(el).attr('property') || $(el).attr('name')}`);
+  });
   return out;
 }
 
@@ -154,6 +174,7 @@ function sourcePriority(sourceTag = '') {
   if (lowered.includes('attr:title') || lowered.includes('attr:aria')) return 1.5;
   if (lowered.includes('link:text')) return 1.2;
   if (lowered.includes('selector')) return 1;
+  if (lowered.includes('meta:')) return 0.6;
   return 0;
 }
 
@@ -184,6 +205,7 @@ function sourceWeight(sourceTags = []) {
     else if (lowered.includes('attr:data')) weight += 0.15;
     else if (lowered.includes('attr:title') || lowered.includes('attr:aria')) weight += 0.12;
     else if (lowered.includes('selector')) weight += 0.08;
+    else if (lowered.includes('meta:')) weight += 0.04;
   }
   return weight;
 }
@@ -276,7 +298,8 @@ export function parseRetailerHtml(html, retailerId) {
   const jsonCandidates = collectJsonNames($);
   const selectorCandidates = collectSelectorCandidates($, retailer.selectors);
   const linkCandidates = collectLinkCandidates($, retailer.linkHints || []);
-  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates]);
+  const metaCandidates = collectMetaCandidates($);
+  const rawCandidates = dedupeRawCandidates([...selectorCandidates, ...jsonCandidates, ...linkCandidates, ...metaCandidates]);
 
   const harmonized = scoreRows(harmonizeIngredientCandidates(rawCandidates).slice(0, 150));
   return validateParsedOffers(finalizeSelection(harmonized, retailerId), retailerId);

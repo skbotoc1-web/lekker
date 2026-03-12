@@ -7,6 +7,7 @@ const STOPWORDS = [
 
 const RETAILER_NOISE = /\b(migros|coop|aldi|lidl|supermarkt|marktfrisch|aktionen)\b/i;
 const NON_FOOD_HINTS = /\b(versicherung|konto|reisen|strom|handy|haushalt|deko|service|lieferung|abholung|pfanne|messer|reiniger|waschmittel)\b/i;
+const RETAILER_LABEL_NOISE = /\b(migros|coop|aldi|lidl|suisse|schweiz|wochenhit|topdeal|hitpreis|aktionspreis|prixgarantie|naturaplan|mbudget|mclassic|chefselect|milbona|deluxe)\b/gi;
 
 const KNOWN_INGREDIENTS = [
   { re: /\bhafer[-\s]?(fl|)ocken?\b/i, canonical: 'Haferflocken', veganLikely: true, categoryHint: 'fruehstueck' },
@@ -102,7 +103,13 @@ const TOKEN_SYNONYMS = new Map([
   ['gemuesemix', 'gemuese'],
   ['gemusemix', 'gemuese'],
   ['lachsportionen', 'lachs'],
-  ['thunfischchunks', 'thunfisch']
+  ['thunfischchunks', 'thunfisch'],
+  ['thunfischinwasser', 'thunfisch'],
+  ['griechischerjoghurt', 'naturjoghurt'],
+  ['griechischesjoghurt', 'naturjoghurt'],
+  ['naturjogurt', 'naturjoghurt'],
+  ['haferflockenbio', 'haferflocken'],
+  ['kichererbsenbio', 'kichererbsen']
 ]);
 
 export const INGREDIENT_TAXONOMY = {
@@ -123,6 +130,7 @@ function sanitizeRaw(input) {
   return String(input || '')
     .replace(/\s+/g, ' ')
     .replace(/[\u00A0]/g, ' ')
+    .replace(RETAILER_LABEL_NOISE, ' ')
     .trim();
 }
 

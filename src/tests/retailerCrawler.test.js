@@ -168,3 +168,17 @@ test('retailer parser also uses image alt and button aria labels as weak fallbac
   assert.equal(new Set(items).size, out.length);
   assert.equal(out.length, 10);
 });
+
+test('retailer parser splits delimiter-heavy labels and extracts useful ingredients', () => {
+  const html = `<article><h2>Paprika Bio | 500g | Aktion</h2></article><article><h2>Skyr Nature / 450g</h2></article>`;
+  const out = parseRetailerHtml(html, 'coop').map(x => x.item);
+  assert.equal(out.includes('Peperoni'), true);
+  assert.equal(out.includes('Skyr'), true);
+});
+
+test('retailer parser can use meta title/description as final fallback source', () => {
+  const html = `<meta property="og:title" content="Frische Zucchetti und Lachsfilet diese Woche" /><meta name="description" content="Top Deal Cherrytomaten" />`;
+  const out = parseRetailerHtml(html, 'lidl').map(x => x.item);
+  assert.equal(out.includes('Zucchini'), true);
+  assert.equal(out.includes('Lachs'), true);
+});

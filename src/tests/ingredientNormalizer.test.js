@@ -122,3 +122,11 @@ test('normalizeIngredient removes retailer brand labels and keeps canonical food
   assert.equal(b?.canonical, 'Tomaten');
   assert.equal(c?.canonical, 'Skyr');
 });
+
+test('normalizeIngredient strips retailer/site noise phrases before canonical mapping', () => {
+  const a = normalizeIngredient('Migros Suisse Wochenhit: Griechischer Joghurt 500g');
+  const b = normalizeIngredient('Coop Schweiz TopDeal Thunfisch in Wasser 2x160g');
+
+  assert.equal(a?.canonical, 'Naturjoghurt');
+  assert.equal(b?.canonical, 'Thunfisch');
+});

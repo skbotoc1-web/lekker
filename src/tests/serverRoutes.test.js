@@ -62,6 +62,9 @@ test('intent landing page and exports are available', async () => {
   assert.equal(a.status, 200);
   const html = await a.text();
   assert.equal(html.includes('Intent-Cluster'), true);
+  assert.equal(html.includes('FAQPage'), true);
+  assert.equal(html.includes('ItemList'), true);
+  assert.equal(html.includes('BreadcrumbList'), true);
 
   const b = await fetch(`${baseUrl}/wochenplan/print`);
   assert.equal(b.status, 200);
